@@ -95,10 +95,7 @@ pub fn init(stats: &mut GpuStats) {
     stats.devices.clear();
 
     // Try to load libnvidia-ml.so
-    let lib_names: [*const i8; 2] = [
-        c"libnvidia-ml.so.1".as_ptr(),
-        c"libnvidia-ml.so".as_ptr(),
-    ];
+    let lib_names: [*const i8; 2] = [c"libnvidia-ml.so.1".as_ptr(), c"libnvidia-ml.so".as_ptr()];
 
     let mut handle: *mut libc::c_void = std::ptr::null_mut();
     for name in lib_names {
