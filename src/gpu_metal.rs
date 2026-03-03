@@ -40,12 +40,15 @@ const K_CF_STRING_ENCODING_UTF8: u32 = 0x08000100;
 /// Function pointer types for IOKit
 type IOMasterPortFn = unsafe extern "C" fn(u32, *mut MachPort) -> i32;
 type IOServiceMatchingFn = unsafe extern "C" fn(*const i8) -> CfMutableDictionaryRef;
-type IOServiceGetMatchingServicesFn = unsafe extern "C" fn(MachPort, CfMutableDictionaryRef, *mut IoIterator) -> i32;
+type IOServiceGetMatchingServicesFn =
+    unsafe extern "C" fn(MachPort, CfMutableDictionaryRef, *mut IoIterator) -> i32;
 type IOIteratorNextFn = unsafe extern "C" fn(IoIterator) -> IoService;
 type IORegistryEntryGetNameFn = unsafe extern "C" fn(IoRegistryEntry, *mut i8) -> i32;
-type IORegistryEntryCreateCFPropertyFn = unsafe extern "C" fn(IoRegistryEntry, CfStringRef, CfAllocatorRef, u32) -> CfTypeRef;
+type IORegistryEntryCreateCFPropertyFn =
+    unsafe extern "C" fn(IoRegistryEntry, CfStringRef, CfAllocatorRef, u32) -> CfTypeRef;
 type IOObjectReleaseFn = unsafe extern "C" fn(u32) -> i32;
-type CfStringCreateWithCStringFn = unsafe extern "C" fn(CfAllocatorRef, *const i8, u32) -> CfStringRef;
+type CfStringCreateWithCStringFn =
+    unsafe extern "C" fn(CfAllocatorRef, *const i8, u32) -> CfStringRef;
 type CfReleaseFn = unsafe extern "C" fn(CfTypeRef);
 type CfGetTypeIdFn = unsafe extern "C" fn(CfTypeRef) -> u64;
 type CfNumberGetTypeFn = unsafe extern "C" fn() -> u64;
@@ -88,7 +91,7 @@ unsafe fn load_sym<T>(handle: *mut libc::c_void, name: &[u8]) -> Option<T> {
 pub fn init(stats: &mut GpuStats) {
     stats.available = false;
     stats.devices.clear();
-    
+
     // Load IOKit framework
     let iokit_handle = unsafe {
         libc::dlopen(
@@ -96,56 +99,96 @@ pub fn init(stats: &mut GpuStats) {
             libc::RTLD_NOW | libc::RTLD_LOCAL,
         )
     };
-    
+
     if iokit_handle.is_null() {
         set_error(stats, b"Failed to load IOKit");
         return;
     }
-    
+
     // Load CoreFoundation
     let cf_handle = unsafe {
         libc::dlopen(
-            b"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\0".as_ptr() as *const i8,
+            b"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation\0".as_ptr()
+                as *const i8,
             libc::RTLD_NOW | libc::RTLD_LOCAL,
         )
     };
-    
+
     if cf_handle.is_null() {
-        unsafe { libc::dlclose(iokit_handle); }
+        unsafe {
+            libc::dlclose(iokit_handle);
+        }
         set_error(stats, b"Failed to load CoreFoundation");
         return;
     }
-    
+
     // Load function pointers
     unsafe {
         let io_master_port: Option<IOMasterPortFn> = load_sym(iokit_handle, b"IOMasterPort\0");
-        let io_service_matching: Option<IOServiceMatchingFn> = load_sym(iokit_handle, b"IOServiceMatching\0");
-        let io_service_get_matching_services: Option<IOServiceGetMatchingServicesFn> = load_sym(iokit_handle, b"IOServiceGetMatchingServices\0");
-        let io_iterator_next: Option<IOIteratorNextFn> = load_sym(iokit_handle, b"IOIteratorNext\0");
-        let io_registry_entry_get_name: Option<IORegistryEntryGetNameFn> = load_sym(iokit_handle, b"IORegistryEntryGetName\0");
-        let io_registry_entry_create_cf_property: Option<IORegistryEntryCreateCFPropertyFn> = load_sym(iokit_handle, b"IORegistryEntryCreateCFProperty\0");
-        let io_object_release: Option<IOObjectReleaseFn> = load_sym(iokit_handle, b"IOObjectRelease\0");
-        
-        let cf_string_create: Option<CfStringCreateWithCStringFn> = load_sym(cf_handle, b"CFStringCreateWithCString\0");
+        let io_service_matching: Option<IOServiceMatchingFn> =
+            load_sym(iokit_handle, b"IOServiceMatching\0");
+        let io_service_get_matching_services: Option<IOServiceGetMatchingServicesFn> =
+            load_sym(iokit_handle, b"IOServiceGetMatchingServices\0");
+        let io_iterator_next: Option<IOIteratorNextFn> =
+            load_sym(iokit_handle, b"IOIteratorNext\0");
+        let io_registry_entry_get_name: Option<IORegistryEntryGetNameFn> =
+            load_sym(iokit_handle, b"IORegistryEntryGetName\0");
+        let io_registry_entry_create_cf_property: Option<IORegistryEntryCreateCFPropertyFn> =
+            load_sym(iokit_handle, b"IORegistryEntryCreateCFProperty\0");
+        let io_object_release: Option<IOObjectReleaseFn> =
+            load_sym(iokit_handle, b"IOObjectRelease\0");
+
+        let cf_string_create: Option<CfStringCreateWithCStringFn> =
+            load_sym(cf_handle, b"CFStringCreateWithCString\0");
         let cf_release: Option<CfReleaseFn> = load_sym(cf_handle, b"CFRelease\0");
         let cf_get_type_id: Option<CfGetTypeIdFn> = load_sym(cf_handle, b"CFGetTypeID\0");
-        let cf_number_get_type_id: Option<CfNumberGetTypeFn> = load_sym(cf_handle, b"CFNumberGetTypeID\0");
-        let cf_number_get_value: Option<CfNumberGetValueFn> = load_sym(cf_handle, b"CFNumberGetValue\0");
-        
+        let cf_number_get_type_id: Option<CfNumberGetTypeFn> =
+            load_sym(cf_handle, b"CFNumberGetTypeID\0");
+        let cf_number_get_value: Option<CfNumberGetValueFn> =
+            load_sym(cf_handle, b"CFNumberGetValue\0");
+
         // Check all required functions
         let (
-            io_master_port, io_service_matching, io_service_get_matching_services,
-            io_iterator_next, io_registry_entry_get_name, io_registry_entry_create_cf_property,
-            io_object_release, cf_string_create, cf_release, cf_get_type_id,
-            cf_number_get_type_id, cf_number_get_value
+            io_master_port,
+            io_service_matching,
+            io_service_get_matching_services,
+            io_iterator_next,
+            io_registry_entry_get_name,
+            io_registry_entry_create_cf_property,
+            io_object_release,
+            cf_string_create,
+            cf_release,
+            cf_get_type_id,
+            cf_number_get_type_id,
+            cf_number_get_value,
         ) = match (
-            io_master_port, io_service_matching, io_service_get_matching_services,
-            io_iterator_next, io_registry_entry_get_name, io_registry_entry_create_cf_property,
-            io_object_release, cf_string_create, cf_release, cf_get_type_id,
-            cf_number_get_type_id, cf_number_get_value
+            io_master_port,
+            io_service_matching,
+            io_service_get_matching_services,
+            io_iterator_next,
+            io_registry_entry_get_name,
+            io_registry_entry_create_cf_property,
+            io_object_release,
+            cf_string_create,
+            cf_release,
+            cf_get_type_id,
+            cf_number_get_type_id,
+            cf_number_get_value,
         ) {
-            (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f), Some(g), Some(h), Some(i), Some(j), Some(k), Some(l)) =>
-                (a, b, c, d, e, f, g, h, i, j, k, l),
+            (
+                Some(a),
+                Some(b),
+                Some(c),
+                Some(d),
+                Some(e),
+                Some(f),
+                Some(g),
+                Some(h),
+                Some(i),
+                Some(j),
+                Some(k),
+                Some(l),
+            ) => (a, b, c, d, e, f, g, h, i, j, k, l),
             _ => {
                 libc::dlclose(iokit_handle);
                 libc::dlclose(cf_handle);
@@ -153,7 +196,7 @@ pub fn init(stats: &mut GpuStats) {
                 return;
             }
         };
-        
+
         // Get master port
         let mut master_port: MachPort = 0;
         let ret = io_master_port(0, &mut master_port);
@@ -163,7 +206,7 @@ pub fn init(stats: &mut GpuStats) {
             set_error(stats, b"Failed to get IOKit master port");
             return;
         }
-        
+
         IOKIT = Some(IOKitLib {
             iokit_handle,
             cf_handle,
@@ -183,9 +226,9 @@ pub fn init(stats: &mut GpuStats) {
             initialized: true,
         });
     }
-    
+
     stats.available = true;
-    
+
     // Initial GPU discovery
     discover_gpus(stats);
 }
@@ -198,34 +241,34 @@ fn discover_gpus(stats: &mut GpuStats) {
             _ => return,
         }
     };
-    
+
     stats.devices.clear();
-    
+
     // Look for IOAccelerator (GPU) devices
     let matching = unsafe { (iokit.io_service_matching)(b"IOAccelerator\0".as_ptr() as *const i8) };
     if matching.is_null() {
         return;
     }
-    
+
     let mut iterator: IoIterator = IO_OBJECT_NULL;
-    let ret = unsafe { 
+    let ret = unsafe {
         (iokit.io_service_get_matching_services)(iokit.master_port, matching, &mut iterator)
     };
-    
+
     if ret != KERN_SUCCESS || iterator == IO_OBJECT_NULL {
         return;
     }
-    
+
     let mut gpu_index = 0u32;
     loop {
         let service = unsafe { (iokit.io_iterator_next)(iterator) };
         if service == IO_OBJECT_NULL {
             break;
         }
-        
+
         let mut device = GpuDevice::default();
         device.index = gpu_index;
-        
+
         // Get device name
         let mut name_buf = [0i8; 128];
         let ret = unsafe { (iokit.io_registry_entry_get_name)(service, name_buf.as_mut_ptr()) };
@@ -237,20 +280,24 @@ fn discover_gpus(stats: &mut GpuStats) {
             }
             device.name_len = copy_len;
         }
-        
+
         // If name is generic, try to get the model
         if device.name_len == 0 || device.name.starts_with(b"IOAccelerator") {
             // Try to get a better name from sysctl
             get_gpu_name_from_sysctl(&mut device);
         }
-        
+
         stats.devices.push(device);
         gpu_index += 1;
-        
-        unsafe { (iokit.io_object_release)(service); }
+
+        unsafe {
+            (iokit.io_object_release)(service);
+        }
     }
-    
-    unsafe { (iokit.io_object_release)(iterator); }
+
+    unsafe {
+        (iokit.io_object_release)(iterator);
+    }
 }
 
 /// Try to get GPU name from sysctl on Apple Silicon
@@ -258,7 +305,7 @@ fn get_gpu_name_from_sysctl(device: &mut GpuDevice) {
     // On Apple Silicon, the GPU is part of the chip, so use chip name
     let mut buf = [0u8; 64];
     let mut len = buf.len();
-    
+
     // Try machdep.cpu.brand_string first (includes chip info)
     let name = b"machdep.cpu.brand_string\0";
     let ret = unsafe {
@@ -270,13 +317,13 @@ fn get_gpu_name_from_sysctl(device: &mut GpuDevice) {
             0,
         )
     };
-    
+
     if ret == 0 && len > 0 {
         // Extract just the chip model (e.g., "Apple M4 Max")
         let copy_len = (len - 1).min(device.name.len());
         device.name[..copy_len].copy_from_slice(&buf[..copy_len]);
         device.name_len = copy_len;
-        
+
         // Append " GPU" suffix
         let suffix = b" GPU";
         if device.name_len + suffix.len() < device.name.len() {
@@ -297,48 +344,48 @@ pub fn update(stats: &mut GpuStats) {
             }
         }
     };
-    
+
     // Re-discover GPUs if list is empty
     if stats.devices.is_empty() {
         discover_gpus(stats);
     }
-    
+
     // Query IOAccelerator statistics
     let matching = unsafe { (iokit.io_service_matching)(b"IOAccelerator\0".as_ptr() as *const i8) };
     if matching.is_null() {
         return;
     }
-    
+
     let mut iterator: IoIterator = IO_OBJECT_NULL;
-    let ret = unsafe { 
+    let ret = unsafe {
         (iokit.io_service_get_matching_services)(iokit.master_port, matching, &mut iterator)
     };
-    
+
     if ret != KERN_SUCCESS || iterator == IO_OBJECT_NULL {
         return;
     }
-    
+
     let mut gpu_index = 0usize;
     loop {
         let service = unsafe { (iokit.io_iterator_next)(iterator) };
         if service == IO_OBJECT_NULL {
             break;
         }
-        
+
         if gpu_index < stats.devices.len() {
             let device = &mut stats.devices[gpu_index];
-            
+
             // Try to get GPU utilization from PerformanceStatistics
             if let Some(util) = get_gpu_utilization(iokit, service) {
                 device.utilization = util;
             }
-            
+
             // Memory on Apple Silicon uses unified memory, show system memory usage
             // This is less useful but provides some indication
             device.mem_total_mb = 0;
             device.mem_used_mb = 0;
             device.mem_utilization = 0.0;
-            
+
             // Temperature might be available via SMC but requires additional APIs
             device.temp_c = None;
             device.power_watts = None;
@@ -346,12 +393,16 @@ pub fn update(stats: &mut GpuStats) {
             device.clock_mhz = None;
             device.mem_clock_mhz = None;
         }
-        
+
         gpu_index += 1;
-        unsafe { (iokit.io_object_release)(service); }
+        unsafe {
+            (iokit.io_object_release)(service);
+        }
     }
-    
-    unsafe { (iokit.io_object_release)(iterator); }
+
+    unsafe {
+        (iokit.io_object_release)(iterator);
+    }
 }
 
 /// Try to get GPU utilization from IOAccelerator statistics
@@ -364,27 +415,31 @@ fn get_gpu_utilization(iokit: &IOKitLib, service: IoService) -> Option<f32> {
             K_CF_STRING_ENCODING_UTF8,
         )
     };
-    
+
     if prop_name.is_null() {
         return None;
     }
-    
+
     // Get the property dictionary
     let props = unsafe {
         (iokit.io_registry_entry_create_cf_property)(service, prop_name, K_CF_ALLOCATOR_DEFAULT, 0)
     };
-    
-    unsafe { (iokit.cf_release)(prop_name as CfTypeRef); }
-    
+
+    unsafe {
+        (iokit.cf_release)(prop_name as CfTypeRef);
+    }
+
     if props.is_null() {
         return None;
     }
-    
+
     // The PerformanceStatistics dictionary contains GPU utilization info
     // but extracting it requires more CoreFoundation dictionary APIs
     // For now, we return a placeholder
-    unsafe { (iokit.cf_release)(props); }
-    
+    unsafe {
+        (iokit.cf_release)(props);
+    }
+
     // Note: Full implementation would need CFDictionaryGetValue to extract
     // "Device Utilization %" or similar keys from PerformanceStatistics
     None

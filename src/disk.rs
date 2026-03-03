@@ -46,7 +46,9 @@ pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
     let data = &buf[..n];
 
     for line in data.split(|&b| b == b'\n') {
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
         // Format: device mountpoint fstype options dump pass
         let mut parts = line.split(|&b| b == b' ');
         let device = parts.next().unwrap_or(b"");
@@ -56,10 +58,23 @@ pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
         // Skip pseudo filesystems.
         if matches!(
             fstype,
-            b"proc" | b"sysfs" | b"devtmpfs" | b"devpts" | b"tmpfs"
-                | b"cgroup" | b"cgroup2" | b"pstore" | b"bpf"
-                | b"securityfs" | b"debugfs" | b"tracefs" | b"mqueue"
-                | b"hugetlbfs" | b"fusectl" | b"rpc_pipefs" | b"none"
+            b"proc"
+                | b"sysfs"
+                | b"devtmpfs"
+                | b"devpts"
+                | b"tmpfs"
+                | b"cgroup"
+                | b"cgroup2"
+                | b"pstore"
+                | b"bpf"
+                | b"securityfs"
+                | b"debugfs"
+                | b"tracefs"
+                | b"mqueue"
+                | b"hugetlbfs"
+                | b"fusectl"
+                | b"rpc_pipefs"
+                | b"none"
         ) {
             continue;
         }
@@ -83,64 +98,59 @@ pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
 pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
     use std::ffi::CStr;
     use std::mem::MaybeUninit;
-    
+
     mounts.clear();
-    
+
     // First call to get count
     let count = unsafe { libc::getfsstat(std::ptr::null_mut(), 0, libc::MNT_NOWAIT) };
     if count <= 0 {
         return;
     }
-    
+
     // Allocate buffer
-    let mut stats: Vec<libc::statfs> = vec![unsafe { MaybeUninit::zeroed().assume_init() }; count as usize];
+    let mut stats: Vec<libc::statfs> =
+        vec![unsafe { MaybeUninit::zeroed().assume_init() }; count as usize];
     let buf_size = (count as usize) * std::mem::size_of::<libc::statfs>();
-    
-    let actual = unsafe {
-        libc::getfsstat(
-            stats.as_mut_ptr(),
-            buf_size as i32,
-            libc::MNT_NOWAIT,
-        )
-    };
-    
+
+    let actual = unsafe { libc::getfsstat(stats.as_mut_ptr(), buf_size as i32, libc::MNT_NOWAIT) };
+
     if actual <= 0 {
         return;
     }
-    
+
     for st in stats.iter().take(actual as usize) {
         // Skip pseudo filesystems
         let fstype = unsafe { CStr::from_ptr(st.f_fstypename.as_ptr()) }
             .to_str()
             .unwrap_or("");
-        
+
         if fstype == "devfs" || fstype == "autofs" || fstype == "nullfs" {
             continue;
         }
-        
+
         let mountpoint = unsafe { CStr::from_ptr(st.f_mntonname.as_ptr()) }
             .to_str()
             .unwrap_or("");
         let device = unsafe { CStr::from_ptr(st.f_mntfromname.as_ptr()) }
             .to_str()
             .unwrap_or("");
-        
+
         if st.f_blocks == 0 {
             continue;
         }
-        
+
         let mut mi = MountInfo::default();
-        
+
         let mp_bytes = mountpoint.as_bytes();
         let mp_len = mp_bytes.len().min(mi.mountpoint.len() - 1);
         mi.mountpoint[..mp_len].copy_from_slice(&mp_bytes[..mp_len]);
         mi.mountpoint_len = mp_len;
-        
+
         let dev_bytes = device.as_bytes();
         let dev_len = dev_bytes.len().min(mi.device.len() - 1);
         mi.device[..dev_len].copy_from_slice(&dev_bytes[..dev_len]);
         mi.device_len = dev_len;
-        
+
         let bsize = st.f_bsize as u64;
         mi.total_bytes = st.f_blocks as u64 * bsize;
         mi.free_bytes = st.f_bavail as u64 * bsize;
@@ -150,7 +160,7 @@ pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
         } else {
             0.0
         };
-        
+
         mounts.push(mi);
     }
 }
@@ -161,8 +171,12 @@ fn statfs_mount(path: &str, device: &[u8], mountpoint: &[u8]) -> Option<MountInf
     let cpath = CString::new(path).ok()?;
     let mut st: libc::statfs = unsafe { core::mem::zeroed() };
     let ret = unsafe { libc::statfs(cpath.as_ptr(), &mut st) };
-    if ret != 0 { return None; }
-    if st.f_blocks == 0 { return None; } // zero-size fs
+    if ret != 0 {
+        return None;
+    }
+    if st.f_blocks == 0 {
+        return None;
+    } // zero-size fs
 
     let mut mi = MountInfo::default();
 
@@ -191,8 +205,7 @@ fn statfs_mount(path: &str, device: &[u8], mountpoint: &[u8]) -> Option<MountInf
 fn parse_diskstats(data: &[u8], disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
     // Collect previous sector counts.
     // Manual zero-init because Default is not derived for arrays > 32.
-    let mut prev: [([u8; 32], usize, u64, u64); 64] =
-        unsafe { core::mem::zeroed() };
+    let mut prev: [([u8; 32], usize, u64, u64); 64] = unsafe { core::mem::zeroed() };
     let mut prev_count = 0usize;
     for d in disks.iter() {
         if prev_count < prev.len() {
@@ -207,12 +220,17 @@ fn parse_diskstats(data: &[u8], disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
 
     for line in data.split(|&b| b == b'\n') {
         let line = trim_bytes(line);
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
 
         let mut fields = line.split(|&b| b == b' ').filter(|s| !s.is_empty());
         fields.next(); // major
         fields.next(); // minor
-        let name = match fields.next() { Some(n) => n, None => continue };
+        let name = match fields.next() {
+            Some(n) => n,
+            None => continue,
+        };
 
         // Skip partition entries (e.g. sda1, sdb2) — only track whole disks.
         // Heuristic: name ends with a digit → partition.
@@ -241,12 +259,10 @@ fn parse_diskstats(data: &[u8], disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
         disk.prev_read_sectors = read_sectors;
         disk.prev_write_sectors = write_sectors;
 
-        let (found, prev_r, prev_w) =
-            find_prev(&prev[..prev_count], &disk.name[..disk.name_len]);
+        let (found, prev_r, prev_w) = find_prev(&prev[..prev_count], &disk.name[..disk.name_len]);
         if found {
             let dt = elapsed_secs.max(0.001) as f64;
-            disk.read_rate =
-                read_sectors.saturating_sub(prev_r) as f64 * SECTOR_BYTES as f64 / dt;
+            disk.read_rate = read_sectors.saturating_sub(prev_r) as f64 * SECTOR_BYTES as f64 / dt;
             disk.write_rate =
                 write_sectors.saturating_sub(prev_w) as f64 * SECTOR_BYTES as f64 / dt;
         }
@@ -268,9 +284,20 @@ fn find_prev(prev: &[([u8; 32], usize, u64, u64)], name: &[u8]) -> (bool, u64, u
 
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn trim_bytes(b: &[u8]) -> &[u8] {
-    let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
-    let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
-    if start >= end { b"" } else { &b[start..end] }
+    let start = b
+        .iter()
+        .position(|&c| !c.is_ascii_whitespace())
+        .unwrap_or(b.len());
+    let end = b
+        .iter()
+        .rposition(|&c| !c.is_ascii_whitespace())
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    if start >= end {
+        b""
+    } else {
+        &b[start..end]
+    }
 }
 
 #[cfg(test)]
@@ -278,8 +305,7 @@ fn trim_bytes(b: &[u8]) -> &[u8] {
 mod tests {
     use super::*;
 
-    const MOCK_DISKSTATS: &[u8] =
-        b"   8       0 sda 1000 0 50000 100 500 0 20000 80 0 100 180\n\
+    const MOCK_DISKSTATS: &[u8] = b"   8       0 sda 1000 0 50000 100 500 0 20000 80 0 100 180\n\
            8       1 sda1 900 0 48000 90 400 0 18000 70 0 90 160\n";
 
     #[test]

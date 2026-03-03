@@ -21,10 +21,10 @@ pub fn update(stats: &mut MemStats) {
 #[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(stats: &mut MemStats) {
     use std::mem::MaybeUninit;
-    
+
     // Get page size
     let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as u64;
-    
+
     // Get total memory via sysctl
     let mut total_bytes: u64 = 0;
     let mut len = std::mem::size_of::<u64>();
@@ -39,13 +39,14 @@ pub fn update(stats: &mut MemStats) {
         );
     }
     stats.total_kb = total_bytes / 1024;
-    
+
     // Get VM statistics
     #[allow(deprecated)]
     let host = unsafe { libc::mach_host_self() };
     let mut vm_stat: libc::vm_statistics64_data_t = unsafe { MaybeUninit::zeroed().assume_init() };
-    let mut count = (std::mem::size_of::<libc::vm_statistics64_data_t>() / std::mem::size_of::<i32>()) as u32;
-    
+    let mut count =
+        (std::mem::size_of::<libc::vm_statistics64_data_t>() / std::mem::size_of::<i32>()) as u32;
+
     let ret = unsafe {
         libc::host_statistics64(
             host,
@@ -54,7 +55,7 @@ pub fn update(stats: &mut MemStats) {
             &mut count,
         )
     };
-    
+
     if ret == libc::KERN_SUCCESS as i32 {
         let free_pages = vm_stat.free_count as u64;
         let active_pages = vm_stat.active_count as u64;
@@ -62,18 +63,19 @@ pub fn update(stats: &mut MemStats) {
         let wired_pages = vm_stat.wire_count as u64;
         let speculative_pages = vm_stat.speculative_count as u64;
         let purgeable_pages = vm_stat.purgeable_count as u64;
-        
+
         stats.free_kb = (free_pages * page_size) / 1024;
-        stats.cached_kb = ((inactive_pages + purgeable_pages + speculative_pages) * page_size) / 1024;
+        stats.cached_kb =
+            ((inactive_pages + purgeable_pages + speculative_pages) * page_size) / 1024;
         stats.buffers_kb = 0; // macOS doesn't separate buffers
-        
+
         // Available = free + inactive + purgeable
         stats.available_kb = ((free_pages + inactive_pages + purgeable_pages) * page_size) / 1024;
-        
+
         // Used = active + wired
         stats.used_kb = ((active_pages + wired_pages) * page_size) / 1024;
     }
-    
+
     // Get swap info via sysctl
     let mut xsu: libc::xsw_usage = unsafe { MaybeUninit::zeroed().assume_init() };
     let mut xsu_len = std::mem::size_of::<libc::xsw_usage>();
@@ -87,7 +89,7 @@ pub fn update(stats: &mut MemStats) {
             0,
         )
     };
-    
+
     if swap_ret == 0 {
         stats.swap_total_kb = xsu.xsu_total / 1024;
         stats.swap_used_kb = xsu.xsu_used / 1024;

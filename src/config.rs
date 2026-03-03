@@ -20,10 +20,7 @@ pub fn load() -> Config {
         None => return cfg,
     };
 
-    let path = format!(
-        "{}/.config/zeroclaw/config.toml",
-        home.to_string_lossy()
-    );
+    let path = format!("{}/.config/zeroclaw/config.toml", home.to_string_lossy());
 
     let mut buf = [0u8; 4096];
     let n = {
@@ -144,16 +141,31 @@ fn apply_key(cfg: &mut Config, section: &[u8], key: &[u8], val: &[u8]) {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 fn trim(b: &[u8]) -> &[u8] {
-    let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
-    let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
-    if start >= end { b"" } else { &b[start..end] }
+    let start = b
+        .iter()
+        .position(|&c| !c.is_ascii_whitespace())
+        .unwrap_or(b.len());
+    let end = b
+        .iter()
+        .rposition(|&c| !c.is_ascii_whitespace())
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    if start >= end {
+        b""
+    } else {
+        &b[start..end]
+    }
 }
 
 fn parse_u32(b: &[u8]) -> Option<u32> {
-    if b.is_empty() { return None; }
+    if b.is_empty() {
+        return None;
+    }
     let mut n = 0u32;
     for &c in b {
-        if !c.is_ascii_digit() { return None; }
+        if !c.is_ascii_digit() {
+            return None;
+        }
         n = n.checked_mul(10)?.checked_add((c - b'0') as u32)?;
     }
     Some(n)

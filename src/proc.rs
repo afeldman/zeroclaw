@@ -76,7 +76,9 @@ pub fn update(
             continue;
         };
         if let Some(wanted) = filter_pid {
-            if pid != wanted { continue; }
+            if pid != wanted {
+                continue;
+            }
         }
 
         let mut info = ProcessInfo::default();
@@ -120,7 +122,7 @@ pub fn update(
     // Process listing on macOS requires:
     // - proc_listpids/proc_pidinfo from libproc (not in libc crate)
     // - Or sysctl with CTL_KERN/KERN_PROC/KERN_PROC_ALL
-    // 
+    //
     // For development purposes, returning empty list.
     // Full implementation would need bindings to libproc.dylib
     procs.clear();
@@ -144,7 +146,9 @@ fn read_proc_stat(pid: u32, info: &mut ProcessInfo) -> bool {
     let path = format!("/proc/{}/stat", pid);
     let mut buf = [0u8; 512];
     let n = read_file(&path, &mut buf);
-    if n == 0 { return false; }
+    if n == 0 {
+        return false;
+    }
     let data = &buf[..n];
 
     // Name is between '(' and ')' and can contain spaces.
@@ -164,12 +168,17 @@ fn read_proc_stat(pid: u32, info: &mut ProcessInfo) -> bool {
     let rest = &data[name_end + 1..];
     let mut fields = rest.split(|&b| b == b' ').filter(|s| !s.is_empty());
 
-    let state = fields.next().and_then(|s| s.first().copied()).unwrap_or(b'?');
+    let state = fields
+        .next()
+        .and_then(|s| s.first().copied())
+        .unwrap_or(b'?');
     info.status = state;
 
     // Skip: ppid pgrp sess tty_nr tpgid flags minflt cminflt majflt cmajflt
     // That's 10 fields (indices 3–12).
-    for _ in 0..10 { fields.next(); }
+    for _ in 0..10 {
+        fields.next();
+    }
 
     // utime (index 13), stime (14)
     let utime = fields.next().and_then(|s| parse_u64(s)).unwrap_or(0);

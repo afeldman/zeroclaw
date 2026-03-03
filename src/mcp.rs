@@ -18,7 +18,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self, BufRead, Write};
 
-use crate::types::{Config, CpuStats, DiskStat, MemStats, MountInfo, NetInterface, ProcessInfo, SysInfo};
+use crate::types::{
+    Config, CpuStats, DiskStat, MemStats, MountInfo, NetInterface, ProcessInfo, SysInfo,
+};
 use crate::{cpu, disk, mem, net, proc, sysinfo};
 
 // ─── JSON-RPC Types ───────────────────────────────────────────────────────────
@@ -205,7 +207,7 @@ pub struct McpServer {
 impl McpServer {
     pub fn new() -> Self {
         proc::init();
-        
+
         let config = Config {
             interval_secs: 1,
             top_n: 10,
@@ -248,7 +250,13 @@ impl McpServer {
 
         cpu::update(&mut self.cpu_stats);
         mem::update(&mut self.mem_stats);
-        proc::update(&mut self.processes, self.mem_stats.total_kb, elapsed, self.config.top_n, None);
+        proc::update(
+            &mut self.processes,
+            self.mem_stats.total_kb,
+            elapsed,
+            self.config.top_n,
+            None,
+        );
         net::update(&mut self.interfaces, elapsed);
         disk::update_io(&mut self.disks, elapsed);
         disk::update_mounts(&mut self.mounts);
@@ -270,18 +278,24 @@ impl McpServer {
             .unwrap_or("Unknown")
             .to_string();
 
-        let cores: Vec<CoreInfo> = self.cpu_stats.cores.iter().map(|c| CoreInfo {
-            id: c.id,
-            usage_percent: c.usage,
-            freq_mhz: c.freq_mhz,
-            temp_c: c.temp_c,
-        }).collect();
+        let cores: Vec<CoreInfo> = self
+            .cpu_stats
+            .cores
+            .iter()
+            .map(|c| CoreInfo {
+                id: c.id,
+                usage_percent: c.usage,
+                freq_mhz: c.freq_mhz,
+                temp_c: c.temp_c,
+            })
+            .collect();
 
         serde_json::to_value(CpuResponse {
             model,
             total_usage_percent: self.cpu_stats.total_usage,
             cores,
-        }).unwrap()
+        })
+        .unwrap()
     }
 
     fn get_memory_stats(&mut self) -> serde_json::Value {
@@ -300,22 +314,27 @@ impl McpServer {
             used_percent,
             swap_total_mb: self.mem_stats.swap_total_kb / 1024,
             swap_used_mb: self.mem_stats.swap_used_kb / 1024,
-        }).unwrap()
+        })
+        .unwrap()
     }
 
     fn get_network_stats(&mut self) -> serde_json::Value {
         self.refresh_if_stale();
 
-        let interfaces: Vec<InterfaceInfo> = self.interfaces.iter().map(|iface| {
-            let name = iface.name_str().to_string();
-            InterfaceInfo {
-                name,
-                rx_bytes_per_sec: iface.rx_rate as u64,
-                tx_bytes_per_sec: iface.tx_rate as u64,
-                rx_total_mb: iface.rx_bytes / (1024 * 1024),
-                tx_total_mb: iface.tx_bytes / (1024 * 1024),
-            }
-        }).collect();
+        let interfaces: Vec<InterfaceInfo> = self
+            .interfaces
+            .iter()
+            .map(|iface| {
+                let name = iface.name_str().to_string();
+                InterfaceInfo {
+                    name,
+                    rx_bytes_per_sec: iface.rx_rate as u64,
+                    tx_bytes_per_sec: iface.tx_rate as u64,
+                    rx_total_mb: iface.rx_bytes / (1024 * 1024),
+                    tx_total_mb: iface.tx_bytes / (1024 * 1024),
+                }
+            })
+            .collect();
 
         serde_json::to_value(NetResponse { interfaces }).unwrap()
     }
@@ -323,27 +342,35 @@ impl McpServer {
     fn get_disk_stats(&mut self) -> serde_json::Value {
         self.refresh_if_stale();
 
-        let io_stats: Vec<DiskIoInfo> = self.disks.iter().map(|d| {
-            let name = d.name_str().to_string();
-            DiskIoInfo {
-                name,
-                read_kb_per_sec: (d.read_rate / 1024.0) as u64,
-                write_kb_per_sec: (d.write_rate / 1024.0) as u64,
-            }
-        }).collect();
+        let io_stats: Vec<DiskIoInfo> = self
+            .disks
+            .iter()
+            .map(|d| {
+                let name = d.name_str().to_string();
+                DiskIoInfo {
+                    name,
+                    read_kb_per_sec: (d.read_rate / 1024.0) as u64,
+                    write_kb_per_sec: (d.write_rate / 1024.0) as u64,
+                }
+            })
+            .collect();
 
-        let mounts: Vec<MountInfoResponse> = self.mounts.iter().map(|m| {
-            let device = m.device_str().to_string();
-            let mount_point = m.mount_str().to_string();
-            MountInfoResponse {
-                device,
-                mount_point,
-                total_gb: m.total_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
-                used_gb: m.used_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
-                available_gb: m.free_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
-                used_percent: m.usage_percent,
-            }
-        }).collect();
+        let mounts: Vec<MountInfoResponse> = self
+            .mounts
+            .iter()
+            .map(|m| {
+                let device = m.device_str().to_string();
+                let mount_point = m.mount_str().to_string();
+                MountInfoResponse {
+                    device,
+                    mount_point,
+                    total_gb: m.total_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    used_gb: m.used_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    available_gb: m.free_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    used_percent: m.usage_percent,
+                }
+            })
+            .collect();
 
         serde_json::to_value(DiskResponse { io_stats, mounts }).unwrap()
     }
@@ -352,8 +379,11 @@ impl McpServer {
         self.refresh_if_stale();
 
         let n = top_n.unwrap_or(self.config.top_n);
-        let processes: Vec<ProcessInfoResponse> = self.processes.iter().take(n).map(|p| {
-            ProcessInfoResponse {
+        let processes: Vec<ProcessInfoResponse> = self
+            .processes
+            .iter()
+            .take(n)
+            .map(|p| ProcessInfoResponse {
                 pid: p.pid,
                 name: p.name_str().to_string(),
                 cpu_percent: p.cpu_usage,
@@ -367,9 +397,10 @@ impl McpServer {
                     b'T' => "Stopped",
                     b'I' => "Idle",
                     _ => "Unknown",
-                }.to_string(),
-            }
-        }).collect();
+                }
+                .to_string(),
+            })
+            .collect();
 
         serde_json::to_value(ProcessResponse { processes }).unwrap()
     }
@@ -387,7 +418,8 @@ impl McpServer {
             load_1: self.sys_info.load_1,
             load_5: self.sys_info.load_5,
             load_15: self.sys_info.load_15,
-        }).unwrap()
+        })
+        .unwrap()
     }
 
     // ─── MCP Protocol Handlers ────────────────────────────────────────────────
@@ -403,7 +435,8 @@ impl McpServer {
                 version: env!("CARGO_PKG_VERSION"),
             },
             capabilities: McpCapabilities { tools },
-        }).unwrap()
+        })
+        .unwrap()
     }
 
     fn handle_tools_list(&self) -> serde_json::Value {
@@ -472,14 +505,21 @@ impl McpServer {
         serde_json::to_value(McpToolsListResult { tools }).unwrap()
     }
 
-    fn handle_tool_call(&mut self, name: &str, args: &serde_json::Value) -> Result<serde_json::Value, String> {
+    fn handle_tool_call(
+        &mut self,
+        name: &str,
+        args: &serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
         let result = match name {
             "get_cpu_stats" => self.get_cpu_stats(),
             "get_memory_stats" => self.get_memory_stats(),
             "get_network_stats" => self.get_network_stats(),
             "get_disk_stats" => self.get_disk_stats(),
             "get_process_list" => {
-                let top_n = args.get("top_n").and_then(|v| v.as_u64()).map(|n| n as usize);
+                let top_n = args
+                    .get("top_n")
+                    .and_then(|v| v.as_u64())
+                    .map(|n| n as usize);
                 self.get_process_list(top_n)
             }
             "get_system_info" => self.get_system_info(),
@@ -492,7 +532,8 @@ impl McpServer {
                 text: serde_json::to_string_pretty(&result).unwrap_or_default(),
             }],
             is_error: None,
-        }).unwrap())
+        })
+        .unwrap())
     }
 
     fn process_request(&mut self, request: &JsonRpcRequest) -> JsonRpcResponse {
@@ -501,8 +542,16 @@ impl McpServer {
             "initialized" => Ok(serde_json::json!({})),
             "tools/list" => Ok(self.handle_tools_list()),
             "tools/call" => {
-                let name = request.params.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                let args = request.params.get("arguments").cloned().unwrap_or(serde_json::json!({}));
+                let name = request
+                    .params
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let args = request
+                    .params
+                    .get("arguments")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
                 self.handle_tool_call(name, &args)
             }
             "ping" => Ok(serde_json::json!({})),

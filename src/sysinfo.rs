@@ -30,11 +30,11 @@ pub fn update(info: &mut SysInfo) {
 #[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_uptime(info: &mut SysInfo) {
     use std::mem::MaybeUninit;
-    
+
     let mut boottime: libc::timeval = unsafe { MaybeUninit::zeroed().assume_init() };
     let mut len = std::mem::size_of::<libc::timeval>();
     let name = b"kern.boottime\0";
-    
+
     let ret = unsafe {
         libc::sysctlbyname(
             name.as_ptr() as *const i8,
@@ -44,7 +44,7 @@ fn macos_read_uptime(info: &mut SysInfo) {
             0,
         )
     };
-    
+
     if ret == 0 {
         let mut now: libc::timeval = unsafe { MaybeUninit::zeroed().assume_init() };
         unsafe { libc::gettimeofday(&mut now, std::ptr::null_mut()) };
@@ -80,11 +80,11 @@ fn macos_read_kernel(info: &mut SysInfo) {
     if info.kernel_len > 0 {
         return;
     }
-    
+
     let mut buf = [0u8; 128];
     let mut len = buf.len();
     let name = b"kern.osrelease\0";
-    
+
     let ret = unsafe {
         libc::sysctlbyname(
             name.as_ptr() as *const i8,
@@ -94,7 +94,7 @@ fn macos_read_kernel(info: &mut SysInfo) {
             0,
         )
     };
-    
+
     if ret == 0 && len > 0 {
         let copy_len = (len - 1).min(info.kernel.len());
         info.kernel[..copy_len].copy_from_slice(&buf[..copy_len]);
@@ -103,7 +103,8 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── /proc/uptime ────────────────────────────────────────────────────────────
-#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_uptime(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
+fn read_uptime(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let n = read_file("/proc/uptime", &mut buf);
     // Format: "12345.67 9876.54\n"  (uptime_secs idle_secs)
@@ -113,7 +114,8 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── /proc/loadavg ───────────────────────────────────────────────────────────
-#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_loadavg(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
+fn read_loadavg(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let n = read_file("/proc/loadavg", &mut buf);
     // Format: "0.52 0.48 0.41 2/543 12345"
@@ -125,7 +127,8 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── hostname ────────────────────────────────────────────────────────────────
-#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_hostname(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
+fn read_hostname(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let n = read_file("/proc/sys/kernel/hostname", &mut buf);
     let trimmed = trim_bytes(&buf[..n]);
@@ -135,7 +138,8 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── kernel version ──────────────────────────────────────────────────────────
-#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_kernel(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
+fn read_kernel(info: &mut SysInfo) {
     if info.kernel_len > 0 {
         return; // Kernel version doesn't change at runtime.
     }
@@ -152,11 +156,17 @@ fn macos_read_kernel(info: &mut SysInfo) {
 /// Parse the integer seconds portion of "12345.67 ..." without float allocation.
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_float_u64(b: &[u8]) -> Option<u64> {
-    if b.is_empty() { return None; }
+    if b.is_empty() {
+        return None;
+    }
     let mut n = 0u64;
     for &c in b {
-        if c == b'.' || c == b' ' || c == b'\n' { break; }
-        if !c.is_ascii_digit() { return None; }
+        if c == b'.' || c == b' ' || c == b'\n' {
+            break;
+        }
+        if !c.is_ascii_digit() {
+            return None;
+        }
         n = n.wrapping_mul(10).wrapping_add((c - b'0') as u64);
     }
     Some(n)
@@ -164,14 +174,28 @@ fn parse_float_u64(b: &[u8]) -> Option<u64> {
 
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_f32(b: &[u8]) -> f32 {
-    core::str::from_utf8(b).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0.0)
+    core::str::from_utf8(b)
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0.0)
 }
 
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn trim_bytes(b: &[u8]) -> &[u8] {
-    let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
-    let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
-    if start >= end { b"" } else { &b[start..end] }
+    let start = b
+        .iter()
+        .position(|&c| !c.is_ascii_whitespace())
+        .unwrap_or(b.len());
+    let end = b
+        .iter()
+        .rposition(|&c| !c.is_ascii_whitespace())
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    if start >= end {
+        b""
+    } else {
+        &b[start..end]
+    }
 }
 
 /// Format uptime seconds into "Nd Hh Mm Ss" in the provided buffer.

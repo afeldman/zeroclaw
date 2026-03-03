@@ -27,7 +27,9 @@ mod gpu_nvidia;
 mod gpu_metal;
 
 use display::{CLEAR_SCREEN, HIDE_CURSOR, MOVE_HOME, SHOW_CURSOR};
-use types::{Args, CpuStats, DiskStat, MemStats, MountInfo, NetInterface, OutputMode, ProcessInfo, SysInfo};
+use types::{
+    Args, CpuStats, DiskStat, MemStats, MountInfo, NetInterface, OutputMode, ProcessInfo, SysInfo,
+};
 
 #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 use types::GpuStats;
@@ -45,9 +47,15 @@ fn main() {
     let mut cfg = config::load();
 
     // CLI args override config file values.
-    if args.interval_secs > 0 { cfg.interval_secs = args.interval_secs; }
-    if args.top_n > 0 { cfg.top_n = args.top_n; }
-    if args.no_color { cfg.color = false; }
+    if args.interval_secs > 0 {
+        cfg.interval_secs = args.interval_secs;
+    }
+    if args.top_n > 0 {
+        cfg.top_n = args.top_n;
+    }
+    if args.no_color {
+        cfg.color = false;
+    }
 
     // Propagate --*-only flags to cfg.show_*
     if args.cpu_only || args.mem_only || args.net_only || args.disk_only || args.proc_only {
@@ -63,10 +71,10 @@ fn main() {
     // Initialize GPU monitoring if enabled
     #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
     let mut gpu_stats = GpuStats::default();
-    
+
     #[cfg(feature = "nvidia")]
     gpu_nvidia::init(&mut gpu_stats);
-    
+
     #[cfg(all(feature = "metal", target_os = "macos"))]
     gpu_metal::init(&mut gpu_stats);
 
@@ -114,8 +122,12 @@ impl State {
         let elapsed = self.last_tick.elapsed().as_secs_f32().max(0.01);
         self.last_tick = std::time::Instant::now();
 
-        if cfg.show_cpu { cpu::update(&mut self.cpu); }
-        if cfg.show_memory { mem::update(&mut self.mem); }
+        if cfg.show_cpu {
+            cpu::update(&mut self.cpu);
+        }
+        if cfg.show_memory {
+            mem::update(&mut self.mem);
+        }
         if cfg.show_processes || cfg.show_memory {
             proc::update(
                 &mut self.procs,
@@ -125,17 +137,19 @@ impl State {
                 filter_pid,
             );
         }
-        if cfg.show_network { net::update(&mut self.ifaces, elapsed); }
+        if cfg.show_network {
+            net::update(&mut self.ifaces, elapsed);
+        }
         if cfg.show_disk {
             disk::update_io(&mut self.disks, elapsed);
             disk::update_mounts(&mut self.mounts);
         }
         sysinfo::update(&mut self.sys);
-        
+
         // Update GPU stats
         #[cfg(feature = "nvidia")]
         gpu_nvidia::update(&mut self.gpu);
-        
+
         #[cfg(all(feature = "metal", target_os = "macos"))]
         gpu_metal::update(&mut self.gpu);
     }
@@ -177,7 +191,9 @@ fn run_json(args: &Args, cfg: &types::Config) {
         );
         out.flush();
 
-        if matches!(args.mode, OutputMode::Once) { break; }
+        if matches!(args.mode, OutputMode::Once) {
+            break;
+        }
         std::thread::sleep(std::time::Duration::from_secs(cfg.interval_secs as u64));
     }
 }
@@ -193,7 +209,9 @@ fn run_compact(args: &Args, cfg: &types::Config) {
         display::render_compact(&mut out, &state.cpu, &state.mem, &state.sys);
         out.flush();
 
-        if matches!(args.mode, OutputMode::Once) { break; }
+        if matches!(args.mode, OutputMode::Once) {
+            break;
+        }
         std::thread::sleep(std::time::Duration::from_secs(cfg.interval_secs as u64));
     }
 }
@@ -217,7 +235,9 @@ fn run_watch(args: &Args, cfg: &types::Config) {
         out.flush();
 
         // Non-blocking keyboard check: 'q' to quit.
-        if key_pressed_q() { break; }
+        if key_pressed_q() {
+            break;
+        }
         std::thread::sleep(std::time::Duration::from_secs(cfg.interval_secs as u64));
     }
 
@@ -225,19 +245,24 @@ fn run_watch(args: &Args, cfg: &types::Config) {
     print!("{}", SHOW_CURSOR);
 }
 
-fn render_all(
-    out: &mut display::OutBuf,
-    state: &State,
-    cfg: &types::Config,
-    width: u16,
-) {
+fn render_all(out: &mut display::OutBuf, state: &State, cfg: &types::Config, width: u16) {
     display::render_header(out, &state.sys, width);
-    if cfg.show_cpu { display::render_cpu(out, &state.cpu, width, cfg.show_temps); }
-    if cfg.show_memory { display::render_mem(out, &state.mem, width); }
+    if cfg.show_cpu {
+        display::render_cpu(out, &state.cpu, width, cfg.show_temps);
+    }
+    if cfg.show_memory {
+        display::render_mem(out, &state.mem, width);
+    }
     #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
-    { display::render_gpu(out, &state.gpu, width); }
-    if cfg.show_processes { display::render_procs(out, &state.procs, width); }
-    if cfg.show_network { display::render_net(out, &state.ifaces, width); }
+    {
+        display::render_gpu(out, &state.gpu, width);
+    }
+    if cfg.show_processes {
+        display::render_procs(out, &state.procs, width);
+    }
+    if cfg.show_network {
+        display::render_net(out, &state.ifaces, width);
+    }
     if cfg.show_disk {
         display::render_disk_io(out, &state.disks, width);
         display::render_mounts(out, &state.mounts, width);
@@ -253,7 +278,7 @@ fn raw_mode_enter() -> libc::termios {
         let mut raw = old;
         // ECHO off, canonical mode off, signals off.
         raw.c_lflag &= !(libc::ECHO | libc::ICANON | libc::ISIG);
-        raw.c_cc[libc::VMIN] = 0;  // non-blocking read
+        raw.c_cc[libc::VMIN] = 0; // non-blocking read
         raw.c_cc[libc::VTIME] = 0;
         libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &raw);
     }
@@ -261,15 +286,15 @@ fn raw_mode_enter() -> libc::termios {
 }
 
 fn raw_mode_restore(old: libc::termios) {
-    unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &old); }
+    unsafe {
+        libc::tcsetattr(libc::STDIN_FILENO, libc::TCSAFLUSH, &old);
+    }
 }
 
 /// Non-blocking check whether 'q' or Ctrl-C was pressed.
 fn key_pressed_q() -> bool {
     let mut buf = [0u8; 1];
-    let n = unsafe {
-        libc::read(libc::STDIN_FILENO, buf.as_mut_ptr() as *mut libc::c_void, 1)
-    };
+    let n = unsafe { libc::read(libc::STDIN_FILENO, buf.as_mut_ptr() as *mut libc::c_void, 1) };
     n == 1 && (buf[0] == b'q' || buf[0] == 3)
 }
 

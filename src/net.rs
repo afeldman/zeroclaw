@@ -27,73 +27,73 @@ pub fn update(ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
 #[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
     use std::ffi::CStr;
-    
+
     // Store previous values
     let prev: Vec<(String, u64, u64)> = ifaces
         .iter()
         .map(|i| (i.name_str().to_string(), i.rx_bytes, i.tx_bytes))
         .collect();
     ifaces.clear();
-    
+
     let mut addrs: *mut libc::ifaddrs = std::ptr::null_mut();
     let ret = unsafe { libc::getifaddrs(&mut addrs) };
     if ret != 0 || addrs.is_null() {
         return;
     }
-    
+
     let mut current = addrs;
     while !current.is_null() {
         let entry = unsafe { &*current };
-        
+
         // Only process AF_LINK (datalink) entries which have the stats
         if !entry.ifa_addr.is_null() {
             let family = unsafe { (*entry.ifa_addr).sa_family } as i32;
-            
+
             if family == libc::AF_LINK {
                 let name = unsafe { CStr::from_ptr(entry.ifa_name) }
                     .to_str()
                     .unwrap_or("?");
-                
+
                 // Skip loopback
                 if name != "lo0" {
                     // Get interface data from ifa_data
                     if !entry.ifa_data.is_null() {
                         let data = entry.ifa_data as *const libc::if_data;
                         let if_data = unsafe { &*data };
-                        
+
                         let mut iface = NetInterface::default();
                         let name_bytes = name.as_bytes();
                         let copy_len = name_bytes.len().min(iface.name.len());
                         iface.name[..copy_len].copy_from_slice(&name_bytes[..copy_len]);
                         iface.name_len = copy_len;
-                        
+
                         iface.rx_bytes = if_data.ifi_ibytes as u64;
                         iface.tx_bytes = if_data.ifi_obytes as u64;
                         iface.rx_packets = if_data.ifi_ipackets as u64;
                         iface.tx_packets = if_data.ifi_opackets as u64;
-                        
+
                         // Find previous values for rate calculation
                         let (prev_rx, prev_tx) = prev
                             .iter()
                             .find(|(n, _, _)| n == name)
                             .map(|(_, rx, tx)| (*rx, *tx))
                             .unwrap_or((iface.rx_bytes, iface.tx_bytes));
-                        
+
                         let dt = elapsed_secs.max(0.001) as f64;
                         iface.rx_rate = iface.rx_bytes.saturating_sub(prev_rx) as f64 / dt;
                         iface.tx_rate = iface.tx_bytes.saturating_sub(prev_tx) as f64 / dt;
                         iface.prev_rx_bytes = iface.rx_bytes;
                         iface.prev_tx_bytes = iface.tx_bytes;
-                        
+
                         ifaces.push(iface);
                     }
                 }
             }
         }
-        
+
         current = unsafe { (*current).ifa_next };
     }
-    
+
     unsafe { libc::freeifaddrs(addrs) };
 }
 
@@ -104,8 +104,7 @@ fn parse_net_dev(data: &[u8], ifaces: &mut Vec<NetInterface>, elapsed_secs: f32)
 
     // Build lookup of existing interface data (for rate calculation).
     // Manual zero-init because Default is not derived for arrays > 32.
-    let mut prev: [([u8; 32], usize, u64, u64); 64] =
-        unsafe { core::mem::zeroed() };
+    let mut prev: [([u8; 32], usize, u64, u64); 64] = unsafe { core::mem::zeroed() };
     let mut prev_count = 0usize;
     for iface in ifaces.iter() {
         if prev_count < prev.len() {
@@ -120,14 +119,18 @@ fn parse_net_dev(data: &[u8], ifaces: &mut Vec<NetInterface>, elapsed_secs: f32)
 
     for line in lines.by_ref() {
         let line = trim_bytes(line);
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
 
         // Find ':' separating interface name from stats.
         let Some(colon) = line.iter().position(|&b| b == b':') else {
             continue;
         };
         let name_bytes = trim_bytes(&line[..colon]);
-        if name_bytes.is_empty() { continue; }
+        if name_bytes.is_empty() {
+            continue;
+        }
 
         let mut iface = NetInterface::default();
         let copy_len = name_bytes.len().min(iface.name.len());
@@ -145,14 +148,20 @@ fn parse_net_dev(data: &[u8], ifaces: &mut Vec<NetInterface>, elapsed_secs: f32)
                 n = n.wrapping_mul(10).wrapping_add((b - b'0') as u64);
                 in_n = true;
             } else if in_n {
-                if idx < 16 { nums[idx] = n; }
+                if idx < 16 {
+                    nums[idx] = n;
+                }
                 idx += 1;
                 n = 0;
                 in_n = false;
-                if idx == 16 { break; }
+                if idx == 16 {
+                    break;
+                }
             }
         }
-        if in_n && idx < 16 { nums[idx] = n; }
+        if in_n && idx < 16 {
+            nums[idx] = n;
+        }
 
         iface.rx_bytes = nums[0];
         iface.rx_packets = nums[1];
@@ -184,9 +193,20 @@ fn find_prev(prev: &[([u8; 32], usize, u64, u64)], name: &[u8]) -> (u64, u64) {
 
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn trim_bytes(b: &[u8]) -> &[u8] {
-    let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
-    let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
-    if start >= end { b"" } else { &b[start..end] }
+    let start = b
+        .iter()
+        .position(|&c| !c.is_ascii_whitespace())
+        .unwrap_or(b.len());
+    let end = b
+        .iter()
+        .rposition(|&c| !c.is_ascii_whitespace())
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    if start >= end {
+        b""
+    } else {
+        &b[start..end]
+    }
 }
 
 #[cfg(test)]
@@ -204,10 +224,16 @@ mod tests {
         let mut ifaces = Vec::new();
         parse_net_dev(MOCK, &mut ifaces, 1.0);
         assert_eq!(ifaces.len(), 2);
-        let lo = ifaces.iter().find(|i| &i.name[..i.name_len] == b"lo").unwrap();
+        let lo = ifaces
+            .iter()
+            .find(|i| &i.name[..i.name_len] == b"lo")
+            .unwrap();
         assert_eq!(lo.rx_bytes, 1000);
         assert_eq!(lo.tx_bytes, 1000);
-        let eth0 = ifaces.iter().find(|i| &i.name[..i.name_len] == b"eth0").unwrap();
+        let eth0 = ifaces
+            .iter()
+            .find(|i| &i.name[..i.name_len] == b"eth0")
+            .unwrap();
         assert_eq!(eth0.rx_bytes, 99999);
     }
 }

@@ -5,9 +5,9 @@
 //! is flushed once per frame — a single write(2) syscall per refresh.
 
 use crate::sysinfo::format_uptime;
-use crate::types::{CpuStats, DiskStat, MemStats, MountInfo, NetInterface, ProcessInfo, SysInfo};
 #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 use crate::types::GpuStats;
+use crate::types::{CpuStats, DiskStat, MemStats, MountInfo, NetInterface, ProcessInfo, SysInfo};
 use std::io::Write;
 
 // ─── ANSI colour codes ────────────────────────────────────────────────────────
@@ -31,7 +31,11 @@ pub const MOVE_HOME: &str = "\x1b[H";
 pub fn terminal_width() -> u16 {
     let mut ws: libc::winsize = unsafe { core::mem::zeroed() };
     let ret = unsafe { libc::ioctl(libc::STDOUT_FILENO, libc::TIOCGWINSZ, &mut ws) };
-    if ret == 0 && ws.ws_col > 0 { ws.ws_col } else { 80 }
+    if ret == 0 && ws.ws_col > 0 {
+        ws.ws_col
+    } else {
+        80
+    }
 }
 
 // ─── Output buffer ────────────────────────────────────────────────────────────
@@ -44,7 +48,10 @@ pub struct OutBuf {
 
 impl OutBuf {
     pub fn new(color: bool) -> Self {
-        Self { buf: Vec::with_capacity(32 * 1024), color }
+        Self {
+            buf: Vec::with_capacity(32 * 1024),
+            color,
+        }
     }
 
     pub fn push_str(&mut self, s: &str) {
@@ -56,11 +63,15 @@ impl OutBuf {
     }
 
     pub fn push_color(&mut self, color: &str) {
-        if self.color { self.push_str(color); }
+        if self.color {
+            self.push_str(color);
+        }
     }
 
     pub fn push_reset(&mut self) {
-        if self.color { self.push_str(RESET); }
+        if self.color {
+            self.push_str(RESET);
+        }
     }
 
     /// Flush to stdout.
@@ -84,7 +95,9 @@ pub fn section(out: &mut OutBuf, title: &str, width: u16) {
     out.push_str(" ");
     let title_len = title.len() + 1;
     let dashes = (width as usize).saturating_sub(title_len);
-    for _ in 0..dashes { out.push_str("─"); }
+    for _ in 0..dashes {
+        out.push_str("─");
+    }
     out.push_reset();
     out.push_str("\n");
 }
@@ -115,7 +128,9 @@ pub fn render_cpu(out: &mut OutBuf, cpu: &CpuStats, width: u16, show_temps: bool
             String::new()
         };
         let temp_str = if show_temps {
-            core.temp_c.map(|t| format!("  {:>5.1}°C", t)).unwrap_or_default()
+            core.temp_c
+                .map(|t| format!("  {:>5.1}°C", t))
+                .unwrap_or_default()
         } else {
             String::new()
         };
@@ -139,32 +154,42 @@ pub fn render_mem(out: &mut OutBuf, mem: &MemStats, width: u16) {
 
     let ram_pct = if mem.total_kb > 0 {
         mem.used_kb as f32 / mem.total_kb as f32 * 100.0
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let swap_pct = if mem.swap_total_kb > 0 {
         mem.swap_used_kb as f32 / mem.swap_total_kb as f32 * 100.0
-    } else { 0.0 };
+    } else {
+        0.0
+    };
 
     out.push_str("  RAM:   ");
     bar(out, ram_pct, 100.0, 28, ram_pct);
-    let ram_str = format!("  {}/{} GB ({:.0}%)\n",
+    let ram_str = format!(
+        "  {}/{} GB ({:.0}%)\n",
         fmt_gib(mem.used_kb * 1024),
         fmt_gib(mem.total_kb * 1024),
-        ram_pct);
+        ram_pct
+    );
     out.push_str(&ram_str);
 
     out.push_str("  Swap:  ");
     bar(out, swap_pct, 100.0, 28, swap_pct);
-    let swap_str = format!("  {}/{} GB ({:.0}%)\n",
+    let swap_str = format!(
+        "  {}/{} GB ({:.0}%)\n",
         fmt_gib(mem.swap_used_kb * 1024),
         fmt_gib(mem.swap_total_kb * 1024),
-        swap_pct);
+        swap_pct
+    );
     out.push_str(&swap_str);
 
     out.push_color(DIM);
-    let detail = format!("  Buffers: {}  Cached: {}  Available: {}\n",
+    let detail = format!(
+        "  Buffers: {}  Cached: {}  Available: {}\n",
         fmt_mib(mem.buffers_kb * 1024),
         fmt_mib(mem.cached_kb * 1024),
-        fmt_mib(mem.available_kb * 1024));
+        fmt_mib(mem.available_kb * 1024)
+    );
     out.push_str(&detail);
     out.push_reset();
 }
@@ -219,7 +244,9 @@ pub fn render_net(out: &mut OutBuf, ifaces: &[NetInterface], width: u16) {
 // ─── Disk ─────────────────────────────────────────────────────────────────────
 
 pub fn render_disk_io(out: &mut OutBuf, disks: &[DiskStat], width: u16) {
-    if disks.is_empty() { return; }
+    if disks.is_empty() {
+        return;
+    }
     section(out, "DISK I/O", width);
     for d in disks {
         out.push_str(&format!(
@@ -232,7 +259,9 @@ pub fn render_disk_io(out: &mut OutBuf, disks: &[DiskStat], width: u16) {
 }
 
 pub fn render_mounts(out: &mut OutBuf, mounts: &[MountInfo], width: u16) {
-    if mounts.is_empty() { return; }
+    if mounts.is_empty() {
+        return;
+    }
     section(out, "FILESYSTEMS", width);
     for m in mounts {
         let pct = m.usage_percent;
@@ -261,11 +290,15 @@ pub fn render_header(out: &mut OutBuf, sys: &SysInfo, width: u16) {
         "ZeroClaw  ─  {}  ─  up {}  ─  load {:.2}/{:.2}/{:.2}",
         sys.hostname_str(),
         uptime_str,
-        sys.load_1, sys.load_5, sys.load_15
+        sys.load_1,
+        sys.load_5,
+        sys.load_15
     );
     out.push_str(&title);
     let pad = (width as usize).saturating_sub(title.len());
-    for _ in 0..pad { out.push_str(" "); }
+    for _ in 0..pad {
+        out.push_str(" ");
+    }
     out.push_reset();
     out.push_str("\n");
     out.push_color(DIM);
@@ -278,13 +311,12 @@ pub fn render_header(out: &mut OutBuf, sys: &SysInfo, width: u16) {
 pub fn render_compact(out: &mut OutBuf, cpu: &CpuStats, mem: &MemStats, sys: &SysInfo) {
     let ram_pct = if mem.total_kb > 0 {
         mem.used_kb as f32 / mem.total_kb as f32 * 100.0
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let line = format!(
         "cpu:{:.1}%  mem:{:.1}%  load:{:.2}  up:{}s\n",
-        cpu.total_usage,
-        ram_pct,
-        sys.load_1,
-        sys.uptime_secs
+        cpu.total_usage, ram_pct, sys.load_1, sys.uptime_secs
     );
     out.push_str(&line);
 }
@@ -322,7 +354,10 @@ pub fn render_json(
     out.push_str("    \"cores\": [\n");
     for (i, c) in cpu.cores.iter().enumerate() {
         let comma = if i + 1 < cpu.cores.len() { "," } else { "" };
-        let temp = c.temp_c.map(|t| format!(", \"temp_c\": {:.1}", t)).unwrap_or_default();
+        let temp = c
+            .temp_c
+            .map(|t| format!(", \"temp_c\": {:.1}", t))
+            .unwrap_or_default();
         out.push_str(&format!(
             "      {{\"id\": {}, \"usage\": {:.1}, \"freq_mhz\": {}{}}}{}",
             c.id, c.usage, c.freq_mhz, temp, comma
@@ -348,7 +383,11 @@ pub fn render_json(
         let comma = if i + 1 < procs.len() { "," } else { "" };
         out.push_str(&format!(
             "    {{\"pid\": {}, \"name\": \"{}\", \"cpu\": {:.1}, \"mem_kb\": {}}}{}",
-            p.pid, p.name_str(), p.cpu_usage, p.mem_kb, comma
+            p.pid,
+            p.name_str(),
+            p.cpu_usage,
+            p.mem_kb,
+            comma
         ));
         out.push_str("\n");
     }
@@ -361,8 +400,12 @@ pub fn render_json(
         out.push_str(&format!(
             "    {{\"name\": \"{}\", \"rx_bytes\": {}, \"tx_bytes\": {}, \
              \"rx_rate\": {:.0}, \"tx_rate\": {:.0}}}{}",
-            iface.name_str(), iface.rx_bytes, iface.tx_bytes,
-            iface.rx_rate, iface.tx_rate, comma
+            iface.name_str(),
+            iface.rx_bytes,
+            iface.tx_bytes,
+            iface.rx_rate,
+            iface.tx_rate,
+            comma
         ));
         out.push_str("\n");
     }
@@ -374,7 +417,10 @@ pub fn render_json(
         let comma = if i + 1 < disks.len() { "," } else { "" };
         out.push_str(&format!(
             "    {{\"name\": \"{}\", \"read_rate\": {:.0}, \"write_rate\": {:.0}}}{}",
-            d.name_str(), d.read_rate, d.write_rate, comma
+            d.name_str(),
+            d.read_rate,
+            d.write_rate,
+            comma
         ));
         out.push_str("\n");
     }
@@ -387,7 +433,12 @@ pub fn render_json(
         out.push_str(&format!(
             "    {{\"mountpoint\": \"{}\", \"device\": \"{}\", \
              \"total_bytes\": {}, \"used_bytes\": {}, \"usage_pct\": {:.1}}}{}",
-            m.mount_str(), m.device_str(), m.total_bytes, m.used_bytes, m.usage_percent, comma
+            m.mount_str(),
+            m.device_str(),
+            m.total_bytes,
+            m.used_bytes,
+            m.usage_percent,
+            comma
         ));
         out.push_str("\n");
     }
@@ -414,10 +465,14 @@ fn bar(out: &mut OutBuf, value: f32, max: f32, width: usize, threshold: f32) {
 
     out.push_str("[");
     out.push_color(color);
-    for _ in 0..filled { out.push_str("█"); }
+    for _ in 0..filled {
+        out.push_str("█");
+    }
     out.push_reset();
     out.push_color(DIM);
-    for _ in filled..width { out.push_str("░"); }
+    for _ in filled..width {
+        out.push_str("░");
+    }
     out.push_reset();
     out.push_str("]");
 
@@ -474,9 +529,9 @@ pub fn render_gpu(out: &mut OutBuf, gpu: &GpuStats, width: u16) {
         }
         return;
     }
-    
+
     section(out, "GPU", width);
-    
+
     for device in &gpu.devices {
         // Device name
         out.push_color(DIM);
@@ -484,11 +539,11 @@ pub fn render_gpu(out: &mut OutBuf, gpu: &GpuStats, width: u16) {
         out.push_bytes(&device.name[..device.name_len]);
         out.push_reset();
         out.push_str("\n");
-        
+
         // GPU utilization bar
         out.push_str("    GPU:  ");
         bar(out, device.utilization, 100.0, 20, device.utilization);
-        
+
         // Additional info on same line
         let mut extras = String::new();
         if let Some(temp) = device.temp_c {
@@ -506,16 +561,18 @@ pub fn render_gpu(out: &mut OutBuf, gpu: &GpuStats, width: u16) {
             out.push_reset();
         }
         out.push_str("\n");
-        
+
         // VRAM bar (if available)
         if device.mem_total_mb > 0 {
             let mem_pct = device.mem_used_mb as f32 / device.mem_total_mb as f32 * 100.0;
             out.push_str("    VRAM: ");
             bar(out, mem_pct, 100.0, 20, mem_pct);
-            out.push_str(&format!("  {}/{}M ({:.0}%)\n",
-                device.mem_used_mb, device.mem_total_mb, mem_pct));
+            out.push_str(&format!(
+                "  {}/{}M ({:.0}%)\n",
+                device.mem_used_mb, device.mem_total_mb, mem_pct
+            ));
         }
-        
+
         // Fan speed (if available)
         if let Some(fan) = device.fan_percent {
             out.push_color(DIM);

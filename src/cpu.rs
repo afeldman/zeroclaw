@@ -44,7 +44,10 @@ fn read_cpuinfo(stats: &mut CpuStats) {
         let rest = &content[pos..];
         if let Some(colon) = rest.iter().position(|&b| b == b':') {
             let after = &rest[colon + 1..];
-            let end = after.iter().position(|&b| b == b'\n').unwrap_or(after.len());
+            let end = after
+                .iter()
+                .position(|&b| b == b'\n')
+                .unwrap_or(after.len());
             let name = trim_bytes(&after[..end]);
             let copy_len = name.len().min(stats.model.len() - 1);
             stats.model[..copy_len].copy_from_slice(&name[..copy_len]);
@@ -95,7 +98,10 @@ fn read_stat(stats: &mut CpuStats) {
         let (total, idle) = parse_stat_line(skip_word(line));
 
         if core_idx >= stats.cores.len() {
-            stats.cores.push(CpuCore { id: core_idx as u32, ..Default::default() });
+            stats.cores.push(CpuCore {
+                id: core_idx as u32,
+                ..Default::default()
+            });
         }
         let core = &mut stats.cores[core_idx];
         let delta_total = total.saturating_sub(core.prev_total);
@@ -125,14 +131,20 @@ fn parse_stat_line(line: &[u8]) -> (u64, u64) {
             num = num.wrapping_mul(10).wrapping_add((b - b'0') as u64);
             in_num = true;
         } else if in_num {
-            if idx < 10 { fields[idx] = num; }
+            if idx < 10 {
+                fields[idx] = num;
+            }
             idx += 1;
             num = 0;
             in_num = false;
-            if idx == 10 { break; }
+            if idx == 10 {
+                break;
+            }
         }
     }
-    if in_num && idx < 10 { fields[idx] = num; }
+    if in_num && idx < 10 {
+        fields[idx] = num;
+    }
 
     // user nice system idle iowait irq softirq steal guest guest_nice
     let idle = fields[3] + fields[4]; // idle + iowait
@@ -173,16 +185,22 @@ fn read_temperatures(stats: &mut CpuStats) {
     for zone in 0..16u32 {
         let path = format!("/sys/class/thermal/thermal_zone{}/temp", zone);
         let n = read_file(&path, &mut buf);
-        if n == 0 { continue; }
+        if n == 0 {
+            continue;
+        }
 
         // Check type to see if it's a CPU zone
         let type_path = format!("/sys/class/thermal/thermal_zone{}/type", zone);
         let mut type_buf = [0u8; 64];
         let tn = read_file(&type_path, &mut type_buf);
         let zone_type = trim_bytes(&type_buf[..tn]);
-        let is_cpu = zone_type.starts_with(b"x86_pkg") || zone_type.starts_with(b"acpitz")
-            || zone_type.starts_with(b"cpu") || zone_type.starts_with(b"CPU");
-        if !is_cpu && zone > 0 { continue; }
+        let is_cpu = zone_type.starts_with(b"x86_pkg")
+            || zone_type.starts_with(b"acpitz")
+            || zone_type.starts_with(b"cpu")
+            || zone_type.starts_with(b"CPU");
+        if !is_cpu && zone > 0 {
+            continue;
+        }
 
         if let Some(millic) = parse_u64(&buf[..n]) {
             let celsius = millic as f32 / 1000.0;
@@ -202,7 +220,9 @@ fn read_temperatures(stats: &mut CpuStats) {
 /// beyond the OS file-descriptor table entry.
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn read_file(path: &str, buf: &mut [u8]) -> usize {
-    let Ok(mut f) = File::open(path) else { return 0; };
+    let Ok(mut f) = File::open(path) else {
+        return 0;
+    };
     f.read(buf).unwrap_or(0)
 }
 
@@ -215,7 +235,10 @@ pub fn read_file(_path: &str, _buf: &mut [u8]) -> usize {
 
 #[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn skip_word(b: &[u8]) -> &[u8] {
-    let pos = b.iter().position(|c| c.is_ascii_whitespace()).unwrap_or(b.len());
+    let pos = b
+        .iter()
+        .position(|c| c.is_ascii_whitespace())
+        .unwrap_or(b.len());
     &b[pos..]
 }
 
@@ -226,18 +249,33 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[allow(dead_code)]
 fn trim_bytes(b: &[u8]) -> &[u8] {
-    let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
-    let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
-    if start >= end { b"" } else { &b[start..end] }
+    let start = b
+        .iter()
+        .position(|&c| !c.is_ascii_whitespace())
+        .unwrap_or(b.len());
+    let end = b
+        .iter()
+        .rposition(|&c| !c.is_ascii_whitespace())
+        .map(|p| p + 1)
+        .unwrap_or(0);
+    if start >= end {
+        b""
+    } else {
+        &b[start..end]
+    }
 }
 
 #[allow(dead_code)]
 pub fn parse_u64(b: &[u8]) -> Option<u64> {
     let b = trim_bytes(b);
-    if b.is_empty() { return None; }
+    if b.is_empty() {
+        return None;
+    }
     let mut n = 0u64;
     for &c in b {
-        if !c.is_ascii_digit() { break; }
+        if !c.is_ascii_digit() {
+            break;
+        }
         n = n.wrapping_mul(10).wrapping_add((c - b'0') as u64);
     }
     Some(n)
@@ -257,10 +295,10 @@ fn macos_read_cpu_info(stats: &mut CpuStats) {
     if stats.model_len > 0 {
         return; // Already read
     }
-    
+
     let mut buf = [0u8; 128];
     let mut len = buf.len();
-    
+
     let name = b"machdep.cpu.brand_string\0";
     let ret = unsafe {
         libc::sysctlbyname(
@@ -271,7 +309,7 @@ fn macos_read_cpu_info(stats: &mut CpuStats) {
             0,
         )
     };
-    
+
     if ret == 0 && len > 0 {
         let copy_len = (len - 1).min(stats.model.len() - 1);
         stats.model[..copy_len].copy_from_slice(&buf[..copy_len]);
@@ -283,7 +321,7 @@ fn macos_read_cpu_info(stats: &mut CpuStats) {
 #[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_cpu_usage(stats: &mut CpuStats) {
     use std::mem::MaybeUninit;
-    
+
     // Get number of CPUs
     let mut ncpu: i32 = 0;
     let mut len = std::mem::size_of::<i32>();
@@ -297,11 +335,11 @@ fn macos_read_cpu_usage(stats: &mut CpuStats) {
             0,
         );
     }
-    
+
     if ncpu <= 0 {
         ncpu = 1;
     }
-    
+
     // Ensure we have enough cores
     while stats.cores.len() < ncpu as usize {
         stats.cores.push(CpuCore {
@@ -309,14 +347,15 @@ fn macos_read_cpu_usage(stats: &mut CpuStats) {
             ..Default::default()
         });
     }
-    
+
     // Get CPU load info via host_statistics
     #[allow(deprecated)]
     let host = unsafe { libc::mach_host_self() };
-    
-    let mut cpu_load: libc::host_cpu_load_info_data_t = unsafe { MaybeUninit::zeroed().assume_init() };
+
+    let mut cpu_load: libc::host_cpu_load_info_data_t =
+        unsafe { MaybeUninit::zeroed().assume_init() };
     let mut count = libc::HOST_CPU_LOAD_INFO_COUNT as u32;
-    
+
     let ret = unsafe {
         libc::host_statistics(
             host,
@@ -325,28 +364,28 @@ fn macos_read_cpu_usage(stats: &mut CpuStats) {
             &mut count,
         )
     };
-    
+
     if ret == libc::KERN_SUCCESS as i32 {
         let user = cpu_load.cpu_ticks[libc::CPU_STATE_USER as usize] as u64;
         let system = cpu_load.cpu_ticks[libc::CPU_STATE_SYSTEM as usize] as u64;
         let idle = cpu_load.cpu_ticks[libc::CPU_STATE_IDLE as usize] as u64;
         let nice = cpu_load.cpu_ticks[libc::CPU_STATE_NICE as usize] as u64;
-        
+
         let total = user + system + idle + nice;
         let _active = user + system + nice;
-        
+
         let delta_total = total.saturating_sub(stats.prev_total);
         let delta_idle = idle.saturating_sub(stats.prev_idle);
-        
+
         stats.total_usage = if delta_total > 0 {
             (1.0 - delta_idle as f32 / delta_total as f32) * 100.0
         } else {
             0.0
         };
-        
+
         stats.prev_total = total;
         stats.prev_idle = idle;
-        
+
         // Apply aggregate usage to all cores (simplified)
         let per_core = stats.total_usage;
         for core in &mut stats.cores {
