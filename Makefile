@@ -109,6 +109,18 @@ fmt:
 lint:
 	cargo clippy -- -D warnings
 
+## Full CI check (format + lint all feature combinations)
+check:
+	@echo "=== Checking formatting ==="
+	cargo fmt --all -- --check
+	@echo "=== Clippy (default) ==="
+	cargo clippy --all-targets -- -D warnings
+	@echo "=== Clippy (mcp,nvidia) ==="
+	cargo clippy --all-targets --features mcp,nvidia -- -D warnings
+	@echo "=== Clippy (macos,metal) ==="
+	cargo clippy --all-targets --features macos,metal -- -D warnings
+	@echo "=== All checks passed! ==="
+
 ## Run tests
 test:
 	cargo test

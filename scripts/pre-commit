@@ -1,0 +1,27 @@
+#!/bin/sh
+# Pre-commit hook for ZeroClaw
+# Install: ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# Check formatting
+echo "  Checking formatting..."
+cargo fmt --all -- --check
+
+# Run clippy on default features
+echo "  Running clippy (default)..."
+cargo clippy --all-targets -- -D warnings 2>/dev/null
+
+# Run clippy on Linux features
+echo "  Running clippy (mcp,nvidia)..."
+cargo clippy --all-targets --features mcp,nvidia -- -D warnings 2>/dev/null
+
+# On macOS, also check macOS features
+if [ "$(uname)" = "Darwin" ]; then
+    echo "  Running clippy (macos,metal)..."
+    cargo clippy --all-targets --features macos,metal -- -D warnings 2>/dev/null
+fi
+
+echo "✅ All checks passed!"
