@@ -1,0 +1,44 @@
+[package]
+name = "zeroclaw"
+version = "0.1.0"
+edition = "2021"
+description = "Ultra-lightweight system monitor"
+license = "MIT"
+readme = "README.md"
+keywords = ["system", "monitor", "linux", "macos", "performance"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "zeroclaw"
+path = "src/main.rs"
+
+[dependencies]
+libc = { version = "0.2", default-features = false }
+
+# MCP server dependencies (only included with --features mcp)
+tokio = { version = "1", features = ["rt", "io-std", "sync", "macros"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+
+[features]
+default = []
+json = []
+mcp = ["tokio", "serde", "serde_json"]
+# macOS support (uses sysctl/mach APIs instead of /proc)
+macos = []
+# NVIDIA GPU support via dlopen (no compile-time dependency)
+nvidia = []
+# Apple Metal/IOKit GPU support (macOS only)
+metal = []
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+overflow-checks = false
