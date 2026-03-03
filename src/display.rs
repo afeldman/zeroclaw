@@ -69,6 +69,7 @@ impl OutBuf {
         let _ = stdout.lock().write_all(&self.buf);
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.buf.clear();
     }

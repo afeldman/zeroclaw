@@ -127,6 +127,7 @@ pub fn update(
 }
 
 /// Returns a slice sorted by memory descending (re-sorts in place).
+#[allow(dead_code)]
 pub fn sort_by_mem(procs: &mut [ProcessInfo]) {
     procs.sort_unstable_by(|a, b| b.mem_kb.cmp(&a.mem_kb));
 }

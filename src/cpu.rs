@@ -208,6 +208,7 @@ pub fn read_file(path: &str, buf: &mut [u8]) -> usize {
 
 /// Stub read_file for macOS — returns 0 as /proc doesn't exist.
 #[cfg(feature = "macos")]
+#[allow(dead_code)]
 pub fn read_file(_path: &str, _buf: &mut [u8]) -> usize {
     0
 }
@@ -223,12 +224,14 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
+#[allow(dead_code)]
 fn trim_bytes(b: &[u8]) -> &[u8] {
     let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
     let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
     if start >= end { b"" } else { &b[start..end] }
 }
 
+#[allow(dead_code)]
 pub fn parse_u64(b: &[u8]) -> Option<u64> {
     let b = trim_bytes(b);
     if b.is_empty() { return None; }

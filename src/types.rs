@@ -15,7 +15,9 @@ pub struct CpuCore {
     /// Celsius from /sys/class/thermal/thermal_zoneN/temp (millidegrees / 1000).
     pub temp_c: Option<f32>,
     // Raw jiffies from the previous /proc/stat sample used to compute delta.
+    #[allow(dead_code)]
     pub prev_total: u64,
+    #[allow(dead_code)]
     pub prev_idle: u64,
 }
 
@@ -75,7 +77,9 @@ pub struct ProcessInfo {
     /// State character: R, S, D, Z, T …
     pub status: u8,
     // Raw jiffies from previous sample.
+    #[allow(dead_code)]
     pub prev_utime: u64,
+    #[allow(dead_code)]
     pub prev_stime: u64,
 }
 
@@ -133,7 +137,9 @@ pub struct DiskStat {
     pub read_rate: f64,
     pub write_rate: f64,
     // Sector counts from previous sample (1 sector = 512 bytes on Linux).
+    #[allow(dead_code)]
     pub prev_read_sectors: u64,
+    #[allow(dead_code)]
     pub prev_write_sectors: u64,
 }
 
