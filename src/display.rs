@@ -323,6 +323,7 @@ pub fn render_compact(out: &mut OutBuf, cpu: &CpuStats, mem: &MemStats, sys: &Sy
 
 // ─── JSON output ──────────────────────────────────────────────────────────────
 
+#[allow(clippy::too_many_arguments)]
 pub fn render_json(
     out: &mut OutBuf,
     cpu: &CpuStats,

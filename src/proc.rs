@@ -81,8 +81,10 @@ pub fn update(
             }
         }
 
-        let mut info = ProcessInfo::default();
-        info.pid = pid;
+        let mut info = ProcessInfo {
+            pid,
+            ..Default::default()
+        };
 
         if !read_proc_stat(pid, &mut info) {
             continue; // process may have exited
@@ -181,8 +183,8 @@ fn read_proc_stat(pid: u32, info: &mut ProcessInfo) -> bool {
     }
 
     // utime (index 13), stime (14)
-    let utime = fields.next().and_then(|s| parse_u64(s)).unwrap_or(0);
-    let stime = fields.next().and_then(|s| parse_u64(s)).unwrap_or(0);
+    let utime = fields.next().and_then(parse_u64).unwrap_or(0);
+    let stime = fields.next().and_then(parse_u64).unwrap_or(0);
 
     info.prev_utime = utime;
     info.prev_stime = stime;

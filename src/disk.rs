@@ -189,9 +189,9 @@ fn statfs_mount(path: &str, device: &[u8], mountpoint: &[u8]) -> Option<MountInf
     mi.device_len = dev_len;
 
     let bsize = st.f_bsize as u64;
-    mi.total_bytes = st.f_blocks as u64 * bsize;
-    mi.free_bytes = st.f_bavail as u64 * bsize; // available to unprivileged users
-    mi.used_bytes = mi.total_bytes.saturating_sub(st.f_bfree as u64 * bsize);
+    mi.total_bytes = st.f_blocks * bsize;
+    mi.free_bytes = st.f_bavail * bsize; // available to unprivileged users
+    mi.used_bytes = mi.total_bytes.saturating_sub(st.f_bfree * bsize);
     mi.usage_percent = if mi.total_bytes > 0 {
         mi.used_bytes as f32 / mi.total_bytes as f32 * 100.0
     } else {
