@@ -1,0 +1,241 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build release binaries for all platforms
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 (glibc) - minimal
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: ""
+            suffix: ""
+            
+          # Linux x86_64 (glibc) - with NVIDIA
+          - name: linux-x86_64-nvidia
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: "nvidia"
+            suffix: "-nvidia"
+            
+          # Linux x86_64 (glibc) - full (NVIDIA + MCP)
+          - name: linux-x86_64-full
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: "nvidia,mcp"
+            suffix: "-full"
+            
+          # Linux x86_64 (musl static) - minimal
+          - name: linux-x86_64-musl
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            features: ""
+            suffix: "-musl"
+            
+          # Linux aarch64 (glibc)
+          - name: linux-aarch64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            features: ""
+            suffix: ""
+            cross: true
+            
+          # macOS x86_64
+          - name: macos-x86_64
+            os: macos-13
+            target: x86_64-apple-darwin
+            features: "macos,metal"
+            suffix: ""
+            
+          # macOS x86_64 - full
+          - name: macos-x86_64-full
+            os: macos-13
+            target: x86_64-apple-darwin
+            features: "macos,metal,mcp"
+            suffix: "-full"
+            
+          # macOS aarch64 (Apple Silicon)
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            features: "macos,metal"
+            suffix: ""
+            
+          # macOS aarch64 (Apple Silicon) - full
+          - name: macos-aarch64-full
+            os: macos-latest
+            target: aarch64-apple-darwin
+            features: "macos,metal,mcp"
+            suffix: "-full"
+            
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      
+      # Install cross-compilation tools for Linux
+      - name: Install musl tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      
+      - name: Install aarch64 toolchain
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+      
+      # Build
+      - name: Build
+        run: |
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            FEATURES="${{ matrix.features }}"
+            if [ -n "$FEATURES" ]; then
+              cross build --release --target ${{ matrix.target }} --features "$FEATURES"
+            else
+              cross build --release --target ${{ matrix.target }}
+            fi
+          else
+            FEATURES="${{ matrix.features }}"
+            if [ -n "$FEATURES" ]; then
+              cargo build --release --target ${{ matrix.target }} --features "$FEATURES"
+            else
+              cargo build --release --target ${{ matrix.target }}
+            fi
+          fi
+      
+      # Strip binary (reduces size significantly)
+      - name: Strip binary (Linux)
+        if: contains(matrix.os, 'ubuntu')
+        run: |
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            aarch64-linux-gnu-strip target/${{ matrix.target }}/release/zeroclaw
+          else
+            strip target/${{ matrix.target }}/release/zeroclaw
+          fi
+      
+      - name: Strip binary (macOS)
+        if: contains(matrix.os, 'macos')
+        run: strip target/${{ matrix.target }}/release/zeroclaw
+      
+      # Package
+      - name: Package
+        run: |
+          mkdir -p dist
+          BIN_NAME="zeroclaw-${{ matrix.name }}${{ matrix.suffix }}"
+          cp target/${{ matrix.target }}/release/zeroclaw dist/${BIN_NAME}
+          cd dist
+          if [[ "${{ matrix.os }}" == *"macos"* ]]; then
+            zip ${BIN_NAME}.zip ${BIN_NAME}
+          else
+            tar -czvf ${BIN_NAME}.tar.gz ${BIN_NAME}
+          fi
+          rm ${BIN_NAME}
+          ls -lh
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zeroclaw-${{ matrix.name }}${{ matrix.suffix }}
+          path: dist/*
+          retention-days: 1
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Create GitHub Release
+  # ─────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Collect release files
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec mv {} release/ \;
+          ls -la release/
+      
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          generate_release_notes: true
+          files: |
+            release/*
+          body: |
+            ## ZeroClaw ${{ github.ref_name }}
+            
+            Ultra-lightweight system monitor for Linux and macOS.
+            
+            ### Downloads
+            
+            | Platform | Variant | Description |
+            |----------|---------|-------------|
+            | Linux x86_64 | `zeroclaw-linux-x86_64.tar.gz` | Minimal, glibc |
+            | Linux x86_64 | `zeroclaw-linux-x86_64-nvidia.tar.gz` | With NVIDIA GPU support |
+            | Linux x86_64 | `zeroclaw-linux-x86_64-full.tar.gz` | NVIDIA + MCP server |
+            | Linux x86_64 | `zeroclaw-linux-x86_64-musl.tar.gz` | Static binary (musl) |
+            | Linux aarch64 | `zeroclaw-linux-aarch64.tar.gz` | ARM64 |
+            | macOS x86_64 | `zeroclaw-macos-x86_64.zip` | Intel Mac + Metal |
+            | macOS x86_64 | `zeroclaw-macos-x86_64-full.zip` | Intel Mac + Metal + MCP |
+            | macOS arm64 | `zeroclaw-macos-aarch64.zip` | Apple Silicon + Metal |
+            | macOS arm64 | `zeroclaw-macos-aarch64-full.zip` | Apple Silicon + Metal + MCP |
+            
+            ### Quick Install
+            
+            ```bash
+            # Linux (x86_64)
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/zeroclaw-linux-x86_64.tar.gz
+            tar xzf zeroclaw-linux-x86_64.tar.gz
+            sudo mv zeroclaw-linux-x86_64 /usr/local/bin/zeroclaw
+            
+            # macOS (Apple Silicon)
+            curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/zeroclaw-macos-aarch64.zip
+            unzip zeroclaw-macos-aarch64.zip
+            sudo mv zeroclaw-macos-aarch64 /usr/local/bin/zeroclaw
+            ```
+            
+            ### Verify
+            
+            ```bash
+            sha256sum -c SHA256SUMS.txt
+            ```
