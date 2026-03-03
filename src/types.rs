@@ -285,6 +285,7 @@ impl GpuDevice {
 
 /// Collection of all GPU devices.
 #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
+#[derive(Default)]
 pub struct GpuStats {
     pub devices: Vec<GpuDevice>,
     /// True if the GPU library was successfully loaded.
@@ -292,18 +293,6 @@ pub struct GpuStats {
     /// Error message if GPU monitoring failed to initialize.
     pub error: Option<[u8; 128]>,
     pub error_len: usize,
-}
-
-#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
-impl Default for GpuStats {
-    fn default() -> Self {
-        Self {
-            devices: Vec::new(),
-            available: false,
-            error: None,
-            error_len: 0,
-        }
-    }
 }
 
 #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]

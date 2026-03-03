@@ -95,14 +95,14 @@ pub fn init(stats: &mut GpuStats) {
     stats.devices.clear();
 
     // Try to load libnvidia-ml.so
-    let lib_names = [
-        b"libnvidia-ml.so.1\0".as_ptr(),
-        b"libnvidia-ml.so\0".as_ptr(),
+    let lib_names: [*const i8; 2] = [
+        c"libnvidia-ml.so.1".as_ptr(),
+        c"libnvidia-ml.so".as_ptr(),
     ];
 
     let mut handle: *mut libc::c_void = std::ptr::null_mut();
     for name in lib_names {
-        handle = unsafe { libc::dlopen(name as *const i8, libc::RTLD_NOW | libc::RTLD_LOCAL) };
+        handle = unsafe { libc::dlopen(name, libc::RTLD_NOW | libc::RTLD_LOCAL) };
         if !handle.is_null() {
             break;
         }
@@ -251,8 +251,8 @@ pub fn update(stats: &mut GpuStats) {
             if ret == NVML_SUCCESS {
                 let len = name_buf.iter().position(|&c| c == 0).unwrap_or(64);
                 let copy_len = len.min(device.name.len());
-                for j in 0..copy_len {
-                    device.name[j] = name_buf[j] as u8;
+                for (j, &byte) in name_buf.iter().take(copy_len).enumerate() {
+                    device.name[j] = byte as u8;
                 }
                 device.name_len = copy_len;
             }
