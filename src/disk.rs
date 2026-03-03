@@ -10,17 +10,17 @@
 //!
 //! On macOS (with --features macos), I/O stats use IOKit and mounts use getfsstat.
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use crate::cpu::{parse_u64, read_file};
 use crate::types::{DiskStat, MountInfo};
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 const SECTOR_BYTES: u64 = 512;
 
 /// Update disk I/O rates.
 ///
 /// `disks` persists between calls to maintain previous sector counts.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update_io(disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
     let mut buf = [0u8; 4096];
     let n = read_file("/proc/diskstats", &mut buf);
@@ -28,7 +28,7 @@ pub fn update_io(disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
 }
 
 /// macOS: Disk I/O stats are complex to get via IOKit, using stub for now.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update_io(_disks: &mut Vec<DiskStat>, _elapsed_secs: f32) {
     // IOKit disk stats require significant additional code.
     // For now, this is a placeholder. Full implementation would use:
@@ -38,7 +38,7 @@ pub fn update_io(_disks: &mut Vec<DiskStat>, _elapsed_secs: f32) {
 }
 
 /// Refresh mount utilisation via the statfs(2) syscall.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
     mounts.clear();
     let mut buf = [0u8; 4096];
@@ -79,7 +79,7 @@ pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
 }
 
 /// macOS implementation using getfsstat.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
     use std::ffi::CStr;
     use std::mem::MaybeUninit;
@@ -155,7 +155,7 @@ pub fn update_mounts(mounts: &mut Vec<MountInfo>) {
     }
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn statfs_mount(path: &str, device: &[u8], mountpoint: &[u8]) -> Option<MountInfo> {
     use std::ffi::CString;
     let cpath = CString::new(path).ok()?;
@@ -187,7 +187,7 @@ fn statfs_mount(path: &str, device: &[u8], mountpoint: &[u8]) -> Option<MountInf
     Some(mi)
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_diskstats(data: &[u8], disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
     // Collect previous sector counts.
     // Manual zero-init because Default is not derived for arrays > 32.
@@ -256,7 +256,7 @@ fn parse_diskstats(data: &[u8], disks: &mut Vec<DiskStat>, elapsed_secs: f32) {
     }
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn find_prev(prev: &[([u8; 32], usize, u64, u64)], name: &[u8]) -> (bool, u64, u64) {
     for entry in prev {
         if &entry.0[..entry.1] == name {
@@ -266,7 +266,7 @@ fn find_prev(prev: &[([u8; 32], usize, u64, u64)], name: &[u8]) -> (bool, u64, u
     (false, 0, 0)
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn trim_bytes(b: &[u8]) -> &[u8] {
     let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
     let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
@@ -274,7 +274,7 @@ fn trim_bytes(b: &[u8]) -> &[u8] {
 }
 
 #[cfg(test)]
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 mod tests {
     use super::*;
 

@@ -11,18 +11,18 @@
 //! On macOS (with --features macos), process listing is a stub since libproc
 //! APIs aren't available in the standard libc crate.
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use crate::cpu::{parse_u64, read_file};
 use crate::types::ProcessInfo;
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use std::collections::HashMap;
 
 /// CLK_TCK — almost always 100 on Linux. We read it once via sysconf.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 static mut CLK_TCK: u64 = 100;
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn init() {
     let hz = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
     if hz > 0 {
@@ -30,7 +30,7 @@ pub fn init() {
     }
 }
 
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn init() {
     // No initialization needed on macOS
 }
@@ -42,7 +42,7 @@ pub fn init() {
 /// * `elapsed_secs` – seconds since last call (for CPU% normalisation)
 /// * `top_n`      – how many processes to return (sorted by CPU descending)
 /// * `filter_pid` – if Some, only include that PID
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update(
     procs: &mut Vec<ProcessInfo>,
     mem_total_kb: u64,
@@ -109,7 +109,7 @@ pub fn update(
 
 /// macOS implementation - simplified stub as libproc isn't in standard libc.
 /// On macOS, process listing requires private Apple APIs not available in libc crate.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(
     procs: &mut Vec<ProcessInfo>,
     _mem_total_kb: u64,
@@ -139,7 +139,7 @@ pub fn sort_by_mem(procs: &mut [ProcessInfo]) {
 /// Format: pid (comm) state ppid pgrp sess tty_nr tpgid flags minflt cminflt
 ///         majflt cmajflt utime stime cutime cstime prio nice …
 /// Fields are 1-indexed in the kernel docs; here we count from 0.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn read_proc_stat(pid: u32, info: &mut ProcessInfo) -> bool {
     let path = format!("/proc/{}/stat", pid);
     let mut buf = [0u8; 512];
@@ -184,7 +184,7 @@ fn read_proc_stat(pid: u32, info: &mut ProcessInfo) -> bool {
 // ─── /proc/[pid]/status ──────────────────────────────────────────────────────
 
 /// Read VmRSS from /proc/[pid]/status for memory usage in KiB.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn read_proc_mem(pid: u32, info: &mut ProcessInfo) {
     let path = format!("/proc/{}/status", pid);
     let mut buf = [0u8; 2048];
@@ -200,7 +200,7 @@ fn read_proc_mem(pid: u32, info: &mut ProcessInfo) {
     }
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_first_u64_in(b: &[u8]) -> u64 {
     let mut n = 0u64;
     let mut found = false;
@@ -216,7 +216,7 @@ fn parse_first_u64_in(b: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 mod tests {
     use super::*;
 

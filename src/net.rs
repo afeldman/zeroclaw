@@ -8,7 +8,7 @@
 //!
 //! On macOS (with --features macos), uses getifaddrs.
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use crate::cpu::read_file;
 use crate::types::NetInterface;
 
@@ -16,7 +16,7 @@ use crate::types::NetInterface;
 ///
 /// `ifaces` persists across calls to maintain previous values for rate calc.
 /// `elapsed_secs` — time since the last call.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update(ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
     let mut buf = [0u8; 4096];
     let n = read_file("/proc/net/dev", &mut buf);
@@ -24,7 +24,7 @@ pub fn update(ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
 }
 
 /// macOS implementation using getifaddrs.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
     use std::ffi::CStr;
     
@@ -97,7 +97,7 @@ pub fn update(ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
     unsafe { libc::freeifaddrs(addrs) };
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_net_dev(data: &[u8], ifaces: &mut Vec<NetInterface>, elapsed_secs: f32) {
     // Skip the two header lines.
     let mut lines = data.split(|&b| b == b'\n').skip(2);
@@ -172,7 +172,7 @@ fn parse_net_dev(data: &[u8], ifaces: &mut Vec<NetInterface>, elapsed_secs: f32)
     }
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn find_prev(prev: &[([u8; 32], usize, u64, u64)], name: &[u8]) -> (u64, u64) {
     for entry in prev {
         if &entry.0[..entry.1] == name {
@@ -182,7 +182,7 @@ fn find_prev(prev: &[([u8; 32], usize, u64, u64)], name: &[u8]) -> (u64, u64) {
     (0, 0)
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn trim_bytes(b: &[u8]) -> &[u8] {
     let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
     let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
@@ -190,7 +190,7 @@ fn trim_bytes(b: &[u8]) -> &[u8] {
 }
 
 #[cfg(test)]
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 mod tests {
     use super::*;
 

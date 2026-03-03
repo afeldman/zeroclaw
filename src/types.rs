@@ -227,7 +227,7 @@ impl SysInfo {
 // =============================================================================
 
 /// GPU device information and statistics.
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 #[derive(Clone)]
 pub struct GpuDevice {
     /// GPU index (0-based).
@@ -255,7 +255,7 @@ pub struct GpuDevice {
     pub mem_clock_mhz: Option<u32>,
 }
 
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 impl Default for GpuDevice {
     fn default() -> Self {
         Self {
@@ -275,15 +275,16 @@ impl Default for GpuDevice {
     }
 }
 
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 impl GpuDevice {
+    #[allow(dead_code)]
     pub fn name_str(&self) -> &str {
         core::str::from_utf8(&self.name[..self.name_len]).unwrap_or("?")
     }
 }
 
 /// Collection of all GPU devices.
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 pub struct GpuStats {
     pub devices: Vec<GpuDevice>,
     /// True if the GPU library was successfully loaded.
@@ -293,7 +294,7 @@ pub struct GpuStats {
     pub error_len: usize,
 }
 
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 impl Default for GpuStats {
     fn default() -> Self {
         Self {
@@ -305,7 +306,7 @@ impl Default for GpuStats {
     }
 }
 
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 impl GpuStats {
     pub fn error_str(&self) -> Option<&str> {
         if self.error_len > 0 {

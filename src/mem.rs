@@ -5,12 +5,12 @@
 //!
 //! On macOS (with --features macos), uses host_statistics64.
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use crate::cpu::read_file;
 use crate::types::MemStats;
 
 /// Populate `stats` from a fresh /proc/meminfo read.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update(stats: &mut MemStats) {
     let mut buf = [0u8; 2048];
     let n = read_file("/proc/meminfo", &mut buf);
@@ -18,7 +18,7 @@ pub fn update(stats: &mut MemStats) {
 }
 
 /// macOS implementation using host_statistics64.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(stats: &mut MemStats) {
     use std::mem::MaybeUninit;
     
@@ -96,7 +96,7 @@ pub fn update(stats: &mut MemStats) {
 }
 
 /// Parse /proc/meminfo key: value kB lines into `stats`.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn parse_meminfo(data: &[u8], stats: &mut MemStats) {
     for line in data.split(|&b| b == b'\n') {
         // Format: "KeyName:   12345 kB"
@@ -135,7 +135,7 @@ pub fn parse_meminfo(data: &[u8], stats: &mut MemStats) {
 }
 
 /// Scan bytes for the first ASCII decimal number and return it.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_first_u64(b: &[u8]) -> u64 {
     let mut n = 0u64;
     let mut found = false;
@@ -151,7 +151,7 @@ fn parse_first_u64(b: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 mod tests {
     use super::*;
 

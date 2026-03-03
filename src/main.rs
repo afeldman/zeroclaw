@@ -23,13 +23,13 @@ mod mcp;
 #[cfg(feature = "nvidia")]
 mod gpu_nvidia;
 
-#[cfg(feature = "metal")]
+#[cfg(all(feature = "metal", target_os = "macos"))]
 mod gpu_metal;
 
 use display::{CLEAR_SCREEN, HIDE_CURSOR, MOVE_HOME, SHOW_CURSOR};
 use types::{Args, CpuStats, DiskStat, MemStats, MountInfo, NetInterface, OutputMode, ProcessInfo, SysInfo};
 
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 use types::GpuStats;
 
 fn main() {
@@ -61,13 +61,13 @@ fn main() {
     proc::init();
 
     // Initialize GPU monitoring if enabled
-    #[cfg(any(feature = "nvidia", feature = "metal"))]
+    #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
     let mut gpu_stats = GpuStats::default();
     
     #[cfg(feature = "nvidia")]
     gpu_nvidia::init(&mut gpu_stats);
     
-    #[cfg(feature = "metal")]
+    #[cfg(all(feature = "metal", target_os = "macos"))]
     gpu_metal::init(&mut gpu_stats);
 
     match args.mode {
@@ -88,7 +88,7 @@ struct State {
     disks: Vec<DiskStat>,
     mounts: Vec<MountInfo>,
     sys: SysInfo,
-    #[cfg(any(feature = "nvidia", feature = "metal"))]
+    #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
     gpu: GpuStats,
     last_tick: std::time::Instant,
 }
@@ -103,7 +103,7 @@ impl State {
             disks: Vec::new(),
             mounts: Vec::new(),
             sys: SysInfo::default(),
-            #[cfg(any(feature = "nvidia", feature = "metal"))]
+            #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
             gpu: GpuStats::default(),
             last_tick: std::time::Instant::now(),
         }
@@ -136,7 +136,7 @@ impl State {
         #[cfg(feature = "nvidia")]
         gpu_nvidia::update(&mut self.gpu);
         
-        #[cfg(feature = "metal")]
+        #[cfg(all(feature = "metal", target_os = "macos"))]
         gpu_metal::update(&mut self.gpu);
     }
 }
@@ -234,7 +234,7 @@ fn render_all(
     display::render_header(out, &state.sys, width);
     if cfg.show_cpu { display::render_cpu(out, &state.cpu, width, cfg.show_temps); }
     if cfg.show_memory { display::render_mem(out, &state.mem, width); }
-    #[cfg(any(feature = "nvidia", feature = "metal"))]
+    #[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
     { display::render_gpu(out, &state.gpu, width); }
     if cfg.show_processes { display::render_procs(out, &state.procs, width); }
     if cfg.show_network { display::render_net(out, &state.ifaces, width); }

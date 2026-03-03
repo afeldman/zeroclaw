@@ -6,7 +6,7 @@
 
 use crate::sysinfo::format_uptime;
 use crate::types::{CpuStats, DiskStat, MemStats, MountInfo, NetInterface, ProcessInfo, SysInfo};
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 use crate::types::GpuStats;
 use std::io::Write;
 
@@ -461,7 +461,7 @@ fn unix_timestamp() -> u64 {
 
 // ─── GPU ──────────────────────────────────────────────────────────────────────
 
-#[cfg(any(feature = "nvidia", feature = "metal"))]
+#[cfg(any(feature = "nvidia", all(feature = "metal", target_os = "macos")))]
 pub fn render_gpu(out: &mut OutBuf, gpu: &GpuStats, width: u16) {
     if !gpu.available && gpu.devices.is_empty() {
         // Don't render section if GPU monitoring failed or no devices

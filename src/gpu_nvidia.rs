@@ -12,6 +12,9 @@
 //! - Fan speed
 //! - Clock frequencies
 
+// Allow static mut refs for lazy NVML initialization (safe: single-threaded access)
+#![allow(static_mut_refs)]
+
 use crate::types::{GpuDevice, GpuStats};
 
 /// NVML return types
@@ -56,6 +59,7 @@ type NvmlDeviceGetFanSpeedFn = unsafe extern "C" fn(NvmlDevice, *mut u32) -> u32
 type NvmlDeviceGetClockInfoFn = unsafe extern "C" fn(NvmlDevice, u32, *mut u32) -> u32;
 
 /// NVML library handle and function pointers
+#[allow(dead_code)]
 struct NvmlLib {
     handle: *mut libc::c_void,
     init: NvmlInitFn,
@@ -257,6 +261,7 @@ pub fn update(stats: &mut GpuStats) {
 }
 
 /// Shutdown NVML library. Call on program exit.
+#[allow(dead_code)]
 pub fn shutdown() {
     unsafe {
         if let Some(nvml) = NVML.take() {

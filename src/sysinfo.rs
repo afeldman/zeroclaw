@@ -5,12 +5,12 @@
 //!
 //! On macOS (with --features macos), uses sysctl.
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use crate::cpu::read_file;
 use crate::types::SysInfo;
 
 /// Populate `info` with fresh system metadata.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update(info: &mut SysInfo) {
     read_uptime(info);
     read_loadavg(info);
@@ -19,7 +19,7 @@ pub fn update(info: &mut SysInfo) {
 }
 
 /// macOS implementation using sysctl.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(info: &mut SysInfo) {
     macos_read_uptime(info);
     macos_read_loadavg(info);
@@ -27,7 +27,7 @@ pub fn update(info: &mut SysInfo) {
     macos_read_kernel(info);
 }
 
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_uptime(info: &mut SysInfo) {
     use std::mem::MaybeUninit;
     
@@ -52,7 +52,7 @@ fn macos_read_uptime(info: &mut SysInfo) {
     }
 }
 
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_loadavg(info: &mut SysInfo) {
     let mut loadavg = [0f64; 3];
     let ret = unsafe { libc::getloadavg(loadavg.as_mut_ptr(), 3) };
@@ -63,7 +63,7 @@ fn macos_read_loadavg(info: &mut SysInfo) {
     }
 }
 
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_hostname(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let ret = unsafe { libc::gethostname(buf.as_mut_ptr() as *mut i8, buf.len()) };
@@ -75,7 +75,7 @@ fn macos_read_hostname(info: &mut SysInfo) {
     }
 }
 
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_kernel(info: &mut SysInfo) {
     if info.kernel_len > 0 {
         return;
@@ -103,7 +103,7 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── /proc/uptime ────────────────────────────────────────────────────────────
-#[cfg(not(feature = "macos"))]fn read_uptime(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_uptime(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let n = read_file("/proc/uptime", &mut buf);
     // Format: "12345.67 9876.54\n"  (uptime_secs idle_secs)
@@ -113,7 +113,7 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── /proc/loadavg ───────────────────────────────────────────────────────────
-#[cfg(not(feature = "macos"))]fn read_loadavg(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_loadavg(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let n = read_file("/proc/loadavg", &mut buf);
     // Format: "0.52 0.48 0.41 2/543 12345"
@@ -125,7 +125,7 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── hostname ────────────────────────────────────────────────────────────────
-#[cfg(not(feature = "macos"))]fn read_hostname(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_hostname(info: &mut SysInfo) {
     let mut buf = [0u8; 64];
     let n = read_file("/proc/sys/kernel/hostname", &mut buf);
     let trimmed = trim_bytes(&buf[..n]);
@@ -135,7 +135,7 @@ fn macos_read_kernel(info: &mut SysInfo) {
 }
 
 // ─── kernel version ──────────────────────────────────────────────────────────
-#[cfg(not(feature = "macos"))]fn read_kernel(info: &mut SysInfo) {
+#[cfg(not(all(feature = "macos", target_os = "macos")))]fn read_kernel(info: &mut SysInfo) {
     if info.kernel_len > 0 {
         return; // Kernel version doesn't change at runtime.
     }
@@ -150,7 +150,7 @@ fn macos_read_kernel(info: &mut SysInfo) {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /// Parse the integer seconds portion of "12345.67 ..." without float allocation.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_float_u64(b: &[u8]) -> Option<u64> {
     if b.is_empty() { return None; }
     let mut n = 0u64;
@@ -162,12 +162,12 @@ fn parse_float_u64(b: &[u8]) -> Option<u64> {
     Some(n)
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_f32(b: &[u8]) -> f32 {
     core::str::from_utf8(b).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0.0)
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn trim_bytes(b: &[u8]) -> &[u8] {
     let start = b.iter().position(|&c| !c.is_ascii_whitespace()).unwrap_or(b.len());
     let end = b.iter().rposition(|&c| !c.is_ascii_whitespace()).map(|p| p + 1).unwrap_or(0);
@@ -198,7 +198,7 @@ pub fn format_uptime(secs: u64, buf: &mut [u8]) -> usize {
 mod tests {
     use super::*;
 
-    #[cfg(not(feature = "macos"))]
+    #[cfg(not(all(feature = "macos", target_os = "macos")))]
     #[test]
     fn test_parse_float_u64() {
         assert_eq!(parse_float_u64(b"12345.67 9876.54\n"), Some(12345));
@@ -214,7 +214,7 @@ mod tests {
         assert_eq!(s, "1d 01h 01m 01s");
     }
 
-    #[cfg(not(feature = "macos"))]
+    #[cfg(not(all(feature = "macos", target_os = "macos")))]
     #[test]
     fn test_parse_loadavg() {
         let data = b"0.52 0.48 0.41 2/543 12345\n";

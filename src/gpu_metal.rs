@@ -14,6 +14,9 @@
 //! - Limited metrics compared to NVIDIA NVML
 //! - Requires IOKit framework bindings
 
+// Allow static mut refs for lazy IOKit initialization (safe: single-threaded access)
+#![allow(static_mut_refs)]
+
 use crate::types::{GpuDevice, GpuStats};
 
 /// IOKit constants
@@ -49,6 +52,7 @@ type CfNumberGetTypeFn = unsafe extern "C" fn() -> u64;
 type CfNumberGetValueFn = unsafe extern "C" fn(CfTypeRef, i32, *mut libc::c_void) -> bool;
 
 /// IOKit library handles and function pointers
+#[allow(dead_code)]
 struct IOKitLib {
     iokit_handle: *mut libc::c_void,
     cf_handle: *mut libc::c_void,
@@ -387,6 +391,7 @@ fn get_gpu_utilization(iokit: &IOKitLib, service: IoService) -> Option<f32> {
 }
 
 /// Shutdown IOKit handles
+#[allow(dead_code)]
 pub fn shutdown() {
     unsafe {
         if let Some(iokit) = IOKIT.take() {

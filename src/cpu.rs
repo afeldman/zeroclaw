@@ -12,14 +12,14 @@
 
 use crate::types::{CpuCore, CpuStats};
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use std::fs::File;
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 use std::io::Read;
 
 /// Fill `stats` with fresh data.  Call this once to initialise, then again
 /// after at least one tick to get meaningful percentages.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn update(stats: &mut CpuStats) {
     read_cpuinfo(stats);
     read_stat(stats);
@@ -29,7 +29,7 @@ pub fn update(stats: &mut CpuStats) {
 
 // ─── /proc/cpuinfo ──────────────────────────────────────────────────────────
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn read_cpuinfo(stats: &mut CpuStats) {
     if stats.model_len > 0 {
         // Model name doesn't change; only read it once.
@@ -55,7 +55,7 @@ fn read_cpuinfo(stats: &mut CpuStats) {
 
 // ─── /proc/stat ─────────────────────────────────────────────────────────────
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn read_stat(stats: &mut CpuStats) {
     // /proc/stat can be large on many-core systems; 16 KB covers 256 cores.
     let mut buf = [0u8; 16384];
@@ -113,7 +113,7 @@ fn read_stat(stats: &mut CpuStats) {
 
 /// Parse space-separated jiffie fields from a cpu line (after the cpu label).
 /// Returns (total_jiffies, idle_jiffies).
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn parse_stat_line(line: &[u8]) -> (u64, u64) {
     let mut fields = [0u64; 10];
     let mut idx = 0;
@@ -142,7 +142,7 @@ fn parse_stat_line(line: &[u8]) -> (u64, u64) {
 
 // ─── CPU frequencies ─────────────────────────────────────────────────────────
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn read_frequencies(stats: &mut CpuStats) {
     let mut buf = [0u8; 32];
     for core in &mut stats.cores {
@@ -165,7 +165,7 @@ fn read_frequencies(stats: &mut CpuStats) {
 /// Read thermal_zone temperatures and assign them to cores heuristically.
 /// Only the first available zone is used for a single temperature reading;
 /// a more sophisticated mapping is skipped to avoid complexity bloat.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn read_temperatures(stats: &mut CpuStats) {
     let mut buf = [0u8; 16];
 
@@ -200,26 +200,26 @@ fn read_temperatures(stats: &mut CpuStats) {
 /// Read a file into `buf`. Returns bytes read, or 0 on error.
 /// Uses a stack-local File that is dropped immediately — no heap allocation
 /// beyond the OS file-descriptor table entry.
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 pub fn read_file(path: &str, buf: &mut [u8]) -> usize {
     let Ok(mut f) = File::open(path) else { return 0; };
     f.read(buf).unwrap_or(0)
 }
 
 /// Stub read_file for macOS — returns 0 as /proc doesn't exist.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 #[allow(dead_code)]
 pub fn read_file(_path: &str, _buf: &mut [u8]) -> usize {
     0
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn skip_word(b: &[u8]) -> &[u8] {
     let pos = b.iter().position(|c| c.is_ascii_whitespace()).unwrap_or(b.len());
     &b[pos..]
 }
 
-#[cfg(not(feature = "macos"))]
+#[cfg(not(all(feature = "macos", target_os = "macos")))]
 fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
@@ -245,14 +245,14 @@ pub fn parse_u64(b: &[u8]) -> Option<u64> {
 
 // ─── macOS implementation ─────────────────────────────────────────────────────
 
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 pub fn update(stats: &mut CpuStats) {
     macos_read_cpu_info(stats);
     macos_read_cpu_usage(stats);
 }
 
 /// Read CPU model via sysctl on macOS.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_cpu_info(stats: &mut CpuStats) {
     if stats.model_len > 0 {
         return; // Already read
@@ -280,7 +280,7 @@ fn macos_read_cpu_info(stats: &mut CpuStats) {
 }
 
 /// Read CPU usage via host_processor_info on macOS.
-#[cfg(feature = "macos")]
+#[cfg(all(feature = "macos", target_os = "macos"))]
 fn macos_read_cpu_usage(stats: &mut CpuStats) {
     use std::mem::MaybeUninit;
     
@@ -359,7 +359,7 @@ fn macos_read_cpu_usage(stats: &mut CpuStats) {
 mod tests {
     use super::*;
 
-    #[cfg(not(feature = "macos"))]
+    #[cfg(not(all(feature = "macos", target_os = "macos")))]
     #[test]
     fn test_parse_stat_line() {
         // user=100 nice=0 system=20 idle=880 iowait=0 irq=0 softirq=0 steal=0
